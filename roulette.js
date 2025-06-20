@@ -39,7 +39,9 @@ function spinRoulette() {
   roulette.style.transform = `translateX(-${offset}px)`;
 
   setTimeout(() => {
-    const prizeUnderPointer = prizes[randomIndex % prizeCount];
+    // Вычисляем индекс приза под pointer после остановки
+    const prizeIndexUnderPointer = (stopIndex - centerIndex) % prizeCount;
+    const prizeUnderPointer = prizes[prizeIndexUnderPointer];
     resultDiv.textContent = `Вы выиграли: ${prizeUnderPointer.name} (${prizeUnderPointer.price}₽)!`;
 
     // Отправка результата в Telegram WebApp
