@@ -8,7 +8,7 @@
 </head>
 <body>
   <div id="tab-content-roulette" class="tab-content active">
-    <h1>🎁 Рулетка подарков</h1>
+    <h1><span>🎁</span> Рулетка подарков</h1>
     <div class="roulette-container">
       <div id="roulette" class="roulette"></div>
       <div class="pointer"></div>
@@ -17,21 +17,20 @@
     <div id="result"></div>
   </div>
   <div id="tab-content-gifts" class="tab-content" style="display:none">
-    <h1>🎁 Мои подарки</h1>
+    <h1 style="color:#e91e63;"><span>🎁</span> Мои подарки</h1>
     <ul id="my-gifts-list">
-      <!-- Здесь будут отображаться подарки -->
+      <!-- Карточки подарков будут добавляться через JS -->
     </ul>
-    <button id="withdraw-btn">Вывести в Telegram</button>
   </div>
   <div id="tab-content-info" class="tab-content" style="display:none">
-    <h1>ℹ️ Информация</h1>
+    <h1 style="color:#1976d2;"><span>ℹ️</span> Информация</h1>
     <p>Это приложение для розыгрыша подарков через Telegram-бота.</p>
     <p>Здесь вы можете крутить рулетку, выигрывать призы и выводить их обратно в бота.</p>
   </div>
   <div class="bottom-tabs">
-    <button class="tab-btn active" data-tab="roulette">Рулетка</button>
-    <button class="tab-btn" data-tab="gifts">Мои подарки</button>
-    <button class="tab-btn" data-tab="info">Информация</button>
+    <button class="tab-btn active" data-tab="roulette"><span class="tab-icon">🎰</span>Рулетка</button>
+    <button class="tab-btn" data-tab="gifts"><span class="tab-icon">🎁</span>Мои подарки</button>
+    <button class="tab-btn" data-tab="info"><span class="tab-icon">ℹ️</span>Информация</button>
   </div>
   <script src="prizes.js"></script>
   <script src="roulette.js"></script>
@@ -45,23 +44,35 @@
     };
     tabBtns.forEach(btn => {
       btn.addEventListener('click', () => {
-        // Снимаем активность со всех кнопок
         tabBtns.forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        // Скрываем все секции
         Object.values(tabContents).forEach(tc => tc.style.display = 'none');
-        // Показываем нужную
         tabContents[btn.dataset.tab].style.display = '';
       });
     });
-    // Кнопка вывода в Telegram
-    document.getElementById('withdraw-btn').onclick = function() {
-      if (window.Telegram && Telegram.WebApp) {
-        Telegram.WebApp.close();
-      } else {
-        alert('Откройте приложение через Telegram');
+
+    // Пример подарка для отображения (замени на динамические данные при необходимости)
+    function renderGiftCard(gift) {
+      return `<li><div class="gift-card">
+        <img src="${gift.img}" alt="${gift.title}">
+        <div class="gift-card-title">${gift.title}</div>
+        <div class="gift-card-date">Выигран: ${gift.date}</div>
+        <button class="gift-card-btn" onclick="window.Telegram && Telegram.WebApp ? Telegram.WebApp.close() : alert('Откройте через Telegram')">Нажмите для вывода</button>
+      </div></li>`;
+    }
+    // Пример данных (замени на реальные)
+    const demoGifts = [
+      {
+        img: 'https://cdn-icons-png.flaticon.com/512/3468/3468379.png',
+        title: 'Astral Shard',
+        date: '20.06.2025'
       }
-    };
+    ];
+    function updateGiftsList() {
+      document.getElementById('my-gifts-list').innerHTML = demoGifts.map(renderGiftCard).join('');
+    }
+    // Показываем пример при открытии вкладки "Мои подарки"
+    document.querySelector('[data-tab="gifts"]').addEventListener('click', updateGiftsList);
   </script>
 </body>
 </html>
