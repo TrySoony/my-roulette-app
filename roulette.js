@@ -1,48 +1,56 @@
-const gifts = [
-  { name: "Книга", stars: 80 },
-  { name: "Котик", stars: 150 },
-  { name: "Плюшевый медведь", stars: 100 },
-  { name: "Сердце", stars: 50 },
-  { name: "Робот", stars: 250 },
-  { name: "Звезда", stars: 300 }
+const prizes = [
+  "iPhone 15",
+  "AirPods",
+  "1000₽",
+  "Пусто",
+  "MacBook",
+  "Чашка",
+  "Пусто",
+  "PlayStation 5",
+  "Пусто",
+  "Книга"
 ];
 
-const rouletteDiv = document.getElementById("roulette");
-const resultDiv = document.getElementById("result");
-const spinBtn = document.getElementById("spin");
+const roulette = document.getElementById('roulette');
+const spinBtn = document.getElementById('spin');
+const resultDiv = document.getElementById('result');
 
-let tg = window.Telegram.WebApp;
-tg.expand();
-
-function renderGifts(highlightIndex = -1) {
-  rouletteDiv.innerHTML = "";
-  gifts.forEach((gift, index) => {
-    const div = document.createElement("div");
-    div.className = "gift" + (index === highlightIndex ? " highlight" : "");
-    div.innerHTML = `<strong>${gift.name}</strong><br>${gift.stars}⭐`;
-    rouletteDiv.appendChild(div);
+function renderPrizes() {
+  roulette.innerHTML = '';
+  // Дублируем призы для плавной анимации
+  const extended = [...prizes, ...prizes, ...prizes];
+  extended.forEach(prize => {
+    const div = document.createElement('div');
+    div.className = 'prize';
+    div.textContent = prize;
+    roulette.appendChild(div);
   });
 }
 
 function spinRoulette() {
-  let i = 0;
-  let current = 0;
-  const total = 20 + Math.floor(Math.random() * 10);
-  const interval = setInterval(() => {
-    renderGifts(current % gifts.length);
-    current++;
-    i++;
-    if (i >= total) {
-      clearInterval(interval);
-      const selected = gifts[(current - 1) % gifts.length];
-      resultDiv.innerHTML = `🎉 Вы выиграли: <b>${selected.name}</b> за ${selected.stars}⭐`;
+  spinBtn.disabled = true;
+  resultDiv.textContent = '';
+  const prizeCount = prizes.length;
+  const prizeWidth = 120; // ширина .prize + margin
+  const randomIndex = Math.floor(Math.random() * prizeCount);
+  const offset = (prizeCount + randomIndex) * prizeWidth - (roulette.parentElement.offsetWidth / 2) + (prizeWidth / 2);
 
-      // Отправим результат боту
-      tg.sendData(JSON.stringify(selected));
+  roulette.style.transition = 'transform 4s cubic-bezier(0.25, 0.1, 0.25, 1)';
+  roulette.style.transform = `translateX(-${offset}px)`;
+
+  setTimeout(() => {
+    const wonPrize = prizes[randomIndex];
+    resultDiv.textContent = `Вы выиграли: ${wonPrize}!`;
+
+    // Отправка результата в Telegram WebApp
+    if (window.Telegram && Telegram.WebApp) {
+      Telegram.WebApp.sendData(JSON.stringify({prize: wonPrize}));
+      Telegram.WebApp.close(); // Закрыть WebApp (по желанию)
     }
-  }, 100);
+
+    spinBtn.disabled = false;
+  }, 4000);
 }
 
-renderGifts();
-
-spinBtn.addEventListener("click", spinRoulette);
+renderPrizes();
+spinBtn.addEventListener('click', spinRoulette);
