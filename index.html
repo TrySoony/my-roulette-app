@@ -54,22 +54,20 @@
     // Пример подарка для отображения (замени на динамические данные при необходимости)
     function renderGiftCard(gift) {
       return `<li><div class="gift-card">
-        <img src="${gift.img}" alt="${gift.title}">
-        <div class="gift-card-title">${gift.title}</div>
+        <img src="${gift.img}" alt="${gift.name}">
+        <div class="gift-card-title">${gift.name}</div>
         <div class="gift-card-date">Выигран: ${gift.date}</div>
         <button class="gift-card-btn" onclick="window.Telegram && Telegram.WebApp ? Telegram.WebApp.close() : alert('Откройте через Telegram')">Нажмите для вывода</button>
       </div></li>`;
     }
-    // Пример данных (замени на реальные)
-    const demoGifts = [
-      {
-        img: 'https://cdn-icons-png.flaticon.com/512/3468/3468379.png',
-        title: 'Astral Shard',
-        date: '20.06.2025'
-      }
-    ];
+    function getGiftsFromStorage() {
+      return JSON.parse(localStorage.getItem('my_gifts') || '[]');
+    }
     function updateGiftsList() {
-      document.getElementById('my-gifts-list').innerHTML = demoGifts.map(renderGiftCard).join('');
+      const gifts = getGiftsFromStorage();
+      document.getElementById('my-gifts-list').innerHTML = gifts.length
+        ? gifts.map(renderGiftCard).join('')
+        : '<div style="color:#888;margin-top:30px;">Подарков пока нет</div>';
     }
     // Показываем пример при открытии вкладки "Мои подарки"
     document.querySelector('[data-tab="gifts"]').addEventListener('click', updateGiftsList);
