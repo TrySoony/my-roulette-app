@@ -51,31 +51,19 @@ function spinRoulette() {
   roulette.style.transform = `translateX(-${offset}px)`;
 
   setTimeout(() => {
-    // Получаем координаты pointer
-    const pointer = document.querySelector('.pointer');
-    const pointerRect = pointer.getBoundingClientRect();
-
-    // Получаем все призы
-    const prizeDivs = document.querySelectorAll('.prize');
-    let foundPrize = null;
-    prizeDivs.forEach(div => {
-      const rect = div.getBoundingClientRect();
-      // Проверяем, находится ли центр pointer внутри div
-      if (pointerRect.left >= rect.left && pointerRect.left <= rect.right) {
-        foundPrize = div.textContent;
-      }
-    });
-
-    // Находим приз по тексту
-    let prizeUnderPointer = null;
-    if (foundPrize) {
-      prizeUnderPointer = prizes.find(prize => foundPrize.startsWith(prize.name));
+    // Получаем текущее смещение transform
+    const transform = roulette.style.transform;
+    const match = /translateX\\(-?(\\d+)px\\)/.exec(transform);
+    let currentOffset = offset;
+    if (match) {
+      currentOffset = parseInt(match[1]);
     }
 
-    // Фолбэк, если не найдено (на всякий случай)
-    if (!prizeUnderPointer) {
-      prizeUnderPointer = prizes[randomIndex % prizeCount];
-    }
+    // Индекс центрального приза в extended
+    const centerPrizeIndex = Math.round(currentOffset / prizeWidth) + centerIndex;
+    // Индекс в оригинальном массиве
+    const prizeIndexUnderPointer = centerPrizeIndex % prizeCount;
+    const prizeUnderPointer = prizes[prizeIndexUnderPointer];
 
     resultDiv.textContent = `Вы выиграли: ${prizeUnderPointer.name} (${prizeUnderPointer.price}₽)!`;
 
