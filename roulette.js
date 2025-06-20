@@ -18,8 +18,18 @@ function spinRoulette() {
   spinBtn.disabled = true;
   resultDiv.textContent = '';
   const prizeCount = prizes.length;
-  const prizeWidth = 120; // или вычисляйте динамически, как выше
-  const visibleCount = 5; // у вас видно 5 призов
+  // Вычисляем ширину приза динамически
+  const tempPrize = document.createElement('div');
+  tempPrize.className = 'prize';
+  tempPrize.style.visibility = 'hidden';
+  tempPrize.textContent = 'test';
+  roulette.appendChild(tempPrize);
+  const prizeWidth = tempPrize.offsetWidth +
+    parseInt(getComputedStyle(tempPrize).marginLeft) +
+    parseInt(getComputedStyle(tempPrize).marginRight);
+  roulette.removeChild(tempPrize);
+  // Количество видимых призов
+  const visibleCount = Math.floor(roulette.parentElement.offsetWidth / prizeWidth);
   const centerIndex = Math.floor(visibleCount / 2);
   const randomIndex = Math.floor(Math.random() * prizeCount);
   const stopIndex = prizeCount + randomIndex;
