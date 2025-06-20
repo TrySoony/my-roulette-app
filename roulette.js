@@ -38,11 +38,17 @@ function spinRoulette() {
   const visibleCount = Math.floor(roulette.parentElement.offsetWidth / prizeWidth);
   const centerIndex = Math.floor(visibleCount / 2);
 
+  // Выбираем случайный приз
   const randomIndex = Math.floor(Math.random() * prizeCount);
   const stopIndex = prizeCount + randomIndex;
-  const offset = (stopIndex - centerIndex) * prizeWidth;
 
-  roulette.style.transition = 'transform 4s cubic-bezier(0.15, 0.85, 0.35, 1)';
+  // Количество полных кругов (5-7)
+  const rounds = Math.floor(Math.random() * 3) + 5; // 5, 6 или 7
+  const totalSteps = rounds * prizeCount + randomIndex;
+  const offset = (prizeCount + totalSteps - centerIndex) * prizeWidth;
+
+  // Быстрая анимация (2 секунды), всегда вправо
+  roulette.style.transition = 'transform 2s cubic-bezier(0.15, 0.85, 0.35, 1)';
   roulette.style.transform = `translateX(-${offset}px)`;
 
   setTimeout(() => {
@@ -83,7 +89,7 @@ function spinRoulette() {
     }
 
     spinBtn.disabled = false;
-  }, 4000);
+  }, 2000);
 }
 
 renderPrizes();
