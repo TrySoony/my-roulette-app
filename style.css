@@ -1,38 +1,48 @@
 body {
-  font-family: sans-serif;
+  font-family: Arial, sans-serif;
   text-align: center;
-  background-color: #f4f4f4;
-  margin: 0;
-  padding: 20px;
+  background: #222;
+  color: #fff;
 }
 
-#roulette {
-  margin: 20px auto;
+.roulette-container {
+  position: relative;
+  width: 400px;
+  margin: 40px auto;
+  height: 120px;
+  overflow: hidden;
+  border: 4px solid #fff;
+  border-radius: 10px;
+  background: #333;
+}
+
+.roulette {
   display: flex;
-  justify-content: center;
-  gap: 10px;
+  transition: transform 4s cubic-bezier(0.25, 0.1, 0.25, 1);
+  height: 120px;
 }
 
-.gift {
-  padding: 10px;
-  background: #eee;
-  border-radius: 8px;
+.prize {
   width: 100px;
-  transition: transform 0.2s;
-}
-
-.highlight {
-  background-color: gold;
-  transform: scale(1.1);
-}
-
-button {
-  padding: 10px 20px;
-  font-size: 16px;
-  background-color: #0088cc;
-  color: white;
-  border: none;
+  height: 100px;
+  margin: 10px;
+  background: #444;
   border-radius: 8px;
-  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: #fff;
+  border: 2px solid #888;
 }
- 
+
+.pointer {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 4px;
+  height: 100%;
+  background: #ff0;
+  transform: translateX(-50%);
+  z-index: 2;
+}
