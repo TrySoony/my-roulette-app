@@ -2,6 +2,30 @@ const roulette = document.getElementById('roulette');
 const spinBtn = document.getElementById('spin');
 const resultDiv = document.getElementById('result');
 
+// Максимум попыток
+const MAX_ATTEMPTS = 2;
+
+function getAttempts() {
+  return parseInt(localStorage.getItem('roulette_attempts') || '0', 10);
+}
+function setAttempts(val) {
+  localStorage.setItem('roulette_attempts', val);
+}
+function incAttempts() {
+  setAttempts(getAttempts() + 1);
+}
+function isSpinAvailable() {
+  return getAttempts() < MAX_ATTEMPTS;
+}
+function updateSpinBtnState() {
+  spinBtn.disabled = !isSpinAvailable();
+  if (!isSpinAvailable()) {
+    spinBtn.textContent = 'Попытки закончились';
+  } else {
+    spinBtn.textContent = 'Крутить!';
+  }
+}
+
 function renderPrizes(extendedPrizes) {
   roulette.innerHTML = '';
   extendedPrizes.forEach(prize => {
@@ -33,7 +57,9 @@ function getPrizeWidth() {
 }
 
 function spinRoulette() {
-  spinBtn.disabled = true;
+  if (!isSpinAvailable()) return;
+  incAttempts();
+  updateSpinBtnState();
   resultDiv.textContent = '';
 
   const prizeCount = prizes.length;
@@ -98,6 +124,7 @@ function spinRoulette() {
 
     if (prizeUnderPointer.starPrice > 0) {
       resultDiv.textContent = `Вы выиграли: ${prizeUnderPointer.name} (${prizeUnderPointer.starPrice}⭐)!`;
+      saveGift(prizeUnderPointer);
     } else {
       resultDiv.textContent = `Вы ничего не выиграли.`;
     }
@@ -108,8 +135,26 @@ function spinRoulette() {
       Telegram.WebApp.close();
     }
 
-    spinBtn.disabled = false;
+    spinBtn.disabled = !isSpinAvailable();
+    if (!isSpinAvailable()) {
+      spinBtn.textContent = 'Попытки закончились';
+    } else {
+      spinBtn.textContent = 'Крутить!';
+    }
   }, 2000);
+}
+
+// Сохраняем выигранный приз
+function saveGift(prize) {
+  if (prize.starPrice === 0) return; // не сохраняем пусто
+  const gifts = JSON.parse(localStorage.getItem('my_gifts') || '[]');
+  gifts.push({
+    name: prize.name,
+    img: prize.img,
+    starPrice: prize.starPrice,
+    date: new Date().toLocaleDateString('ru-RU')
+  });
+  localStorage.setItem('my_gifts', JSON.stringify(gifts));
 }
 
 // Первичная отрисовка (по умолчанию 3 круга)
@@ -127,5 +172,8 @@ function spinRoulette() {
   extendedPrizes = extendedPrizes.slice(0, extendedLength);
   renderPrizes(extendedPrizes);
 })();
+
+// При загрузке страницы обновляем состояние кнопки
+updateSpinBtnState();
 
 spinBtn.addEventListener('click', spinRoulette);
