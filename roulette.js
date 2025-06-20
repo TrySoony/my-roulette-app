@@ -14,11 +14,7 @@ function renderPrizes() {
   });
 }
 
-function spinRoulette() {
-  spinBtn.disabled = true;
-  resultDiv.textContent = '';
-
-  // Динамически вычисляем ширину приза
+function getPrizeWidth() {
   const tempPrize = document.createElement('div');
   tempPrize.className = 'prize';
   tempPrize.style.visibility = 'hidden';
@@ -28,43 +24,34 @@ function spinRoulette() {
     parseInt(getComputedStyle(tempPrize).marginLeft) +
     parseInt(getComputedStyle(tempPrize).marginRight);
   roulette.removeChild(tempPrize);
+  return prizeWidth;
+}
+
+function spinRoulette() {
+  spinBtn.disabled = true;
+  resultDiv.textContent = '';
+
+  // Рендерим extended призы для анимации
+  renderPrizes();
 
   const prizeCount = prizes.length;
-  const extended = [...prizes, ...prizes, ...prizes];
-  roulette.innerHTML = '';
-  extended.forEach(prize => {
-    const div = document.createElement('div');
-    div.className = 'prize';
-    div.textContent = `${prize.name} (${prize.price}₽)`;
-    roulette.appendChild(div);
-  });
-
-  // Количество видимых призов
+  const prizeWidth = getPrizeWidth();
   const visibleCount = Math.floor(roulette.parentElement.offsetWidth / prizeWidth);
   const centerIndex = Math.floor(visibleCount / 2);
 
+  // Выбираем случайный приз
   const randomIndex = Math.floor(Math.random() * prizeCount);
   const stopIndex = prizeCount + randomIndex;
   const offset = (stopIndex - centerIndex) * prizeWidth;
 
-  roulette.style.transition = 'transform 4s cubic-bezier(0.25, 0.1, 0.25, 1)';
+  // Для плавной анимации с равномерным замедлением используем cubic-bezier
+  roulette.style.transition = 'transform 4s cubic-bezier(0.15, 0.85, 0.35, 1)';
   roulette.style.transform = `translateX(-${offset}px)`;
 
   setTimeout(() => {
-    // Получаем текущее смещение transform
-    const transform = roulette.style.transform;
-    const match = /translateX\\(-?(\\d+)px\\)/.exec(transform);
-    let currentOffset = offset;
-    if (match) {
-      currentOffset = parseInt(match[1]);
-    }
-
-    // Индекс центрального приза в extended
-    const centerPrizeIndex = Math.round(currentOffset / prizeWidth) + centerIndex;
-    // Индекс в оригинальном массиве
-    const prizeIndexUnderPointer = centerPrizeIndex % prizeCount;
+    // Надёжно определяем индекс выигрыша
+    const prizeIndexUnderPointer = randomIndex;
     const prizeUnderPointer = prizes[prizeIndexUnderPointer];
-
     resultDiv.textContent = `Вы выиграли: ${prizeUnderPointer.name} (${prizeUnderPointer.price}₽)!`;
 
     // Отправка результата в Telegram WebApp
