@@ -17,8 +17,8 @@ function renderPrizes() {
 function spinRoulette() {
   spinBtn.disabled = true;
   resultDiv.textContent = '';
-  const prizeCount = prizes.length;
-  // Вычисляем ширину приза динамически
+
+  // Динамически вычисляем ширину приза
   const tempPrize = document.createElement('div');
   tempPrize.className = 'prize';
   tempPrize.style.visibility = 'hidden';
@@ -28,9 +28,21 @@ function spinRoulette() {
     parseInt(getComputedStyle(tempPrize).marginLeft) +
     parseInt(getComputedStyle(tempPrize).marginRight);
   roulette.removeChild(tempPrize);
+
+  const prizeCount = prizes.length;
+  const extended = [...prizes, ...prizes, ...prizes];
+  roulette.innerHTML = '';
+  extended.forEach(prize => {
+    const div = document.createElement('div');
+    div.className = 'prize';
+    div.textContent = `${prize.name} (${prize.price}₽)`;
+    roulette.appendChild(div);
+  });
+
   // Количество видимых призов
   const visibleCount = Math.floor(roulette.parentElement.offsetWidth / prizeWidth);
   const centerIndex = Math.floor(visibleCount / 2);
+
   const randomIndex = Math.floor(Math.random() * prizeCount);
   const stopIndex = prizeCount + randomIndex;
   const offset = (stopIndex - centerIndex) * prizeWidth;
@@ -39,9 +51,32 @@ function spinRoulette() {
   roulette.style.transform = `translateX(-${offset}px)`;
 
   setTimeout(() => {
-    // Вычисляем индекс приза под pointer после остановки (гарантируем положительный индекс)
-    const prizeIndexUnderPointer = ((stopIndex - centerIndex) % prizeCount + prizeCount) % prizeCount;
-    const prizeUnderPointer = prizes[prizeIndexUnderPointer];
+    // Получаем координаты pointer
+    const pointer = document.querySelector('.pointer');
+    const pointerRect = pointer.getBoundingClientRect();
+
+    // Получаем все призы
+    const prizeDivs = document.querySelectorAll('.prize');
+    let foundPrize = null;
+    prizeDivs.forEach(div => {
+      const rect = div.getBoundingClientRect();
+      // Проверяем, находится ли центр pointer внутри div
+      if (pointerRect.left >= rect.left && pointerRect.left <= rect.right) {
+        foundPrize = div.textContent;
+      }
+    });
+
+    // Находим приз по тексту
+    let prizeUnderPointer = null;
+    if (foundPrize) {
+      prizeUnderPointer = prizes.find(prize => foundPrize.startsWith(prize.name));
+    }
+
+    // Фолбэк, если не найдено (на всякий случай)
+    if (!prizeUnderPointer) {
+      prizeUnderPointer = prizes[randomIndex % prizeCount];
+    }
+
     resultDiv.textContent = `Вы выиграли: ${prizeUnderPointer.name} (${prizeUnderPointer.price}₽)!`;
 
     // Отправка результата в Telegram WebApp
