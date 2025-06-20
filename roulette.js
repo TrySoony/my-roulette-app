@@ -7,7 +7,14 @@ function renderPrizes(extendedPrizes) {
   extendedPrizes.forEach(prize => {
     const div = document.createElement('div');
     div.className = 'prize';
-    div.textContent = `${prize.name} (${prize.price}₽)`;
+    if (prize.img) {
+      div.innerHTML = `<img src="${prize.img}" class="prize-img" alt="${prize.name}">
+                       <div class="prize-name">${prize.name}</div>
+                       <div class="prize-price">${prize.starPrice}⭐</div>`;
+    } else {
+      div.innerHTML = `<div class="prize-name" style="font-size:18px;">${prize.name}</div>
+                       <div class="prize-price" style="color:#bbb;">Пусто</div>`;
+    }
     roulette.appendChild(div);
   });
 }
@@ -73,14 +80,15 @@ function spinRoulette() {
         pointerRect.left >= rect.left &&
         pointerRect.left <= rect.right
       ) {
-        foundPrize = div.textContent;
+        // prize.name теперь в .prize-name
+        foundPrize = div.querySelector('.prize-name').textContent;
       }
     });
 
-    // Находим приз по тексту
+    // Находим приз по названию
     let prizeUnderPointer = null;
     if (foundPrize) {
-      prizeUnderPointer = prizes.find(prize => foundPrize.startsWith(prize.name));
+      prizeUnderPointer = prizes.find(prize => foundPrize === prize.name);
     }
 
     // Фолбэк, если не найдено (на всякий случай)
@@ -88,7 +96,11 @@ function spinRoulette() {
       prizeUnderPointer = prizes[randomIndex % prizeCount];
     }
 
-    resultDiv.textContent = `Вы выиграли: ${prizeUnderPointer.name} (${prizeUnderPointer.price}₽)!`;
+    if (prizeUnderPointer.starPrice > 0) {
+      resultDiv.textContent = `Вы выиграли: ${prizeUnderPointer.name} (${prizeUnderPointer.starPrice}⭐)!`;
+    } else {
+      resultDiv.textContent = `Вы ничего не выиграли.`;
+    }
 
     // Отправка результата в Telegram WebApp
     if (window.Telegram && Telegram.WebApp) {
