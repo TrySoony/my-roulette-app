@@ -2,11 +2,9 @@ const roulette = document.getElementById('roulette');
 const spinBtn = document.getElementById('spin');
 const resultDiv = document.getElementById('result');
 
-function renderPrizes() {
+function renderPrizes(extendedPrizes) {
   roulette.innerHTML = '';
-  // Дублируем призы для плавной анимации
-  const extended = [...prizes, ...prizes, ...prizes];
-  extended.forEach(prize => {
+  extendedPrizes.forEach(prize => {
     const div = document.createElement('div');
     div.className = 'prize';
     div.textContent = `${prize.name} (${prize.price}₽)`;
@@ -31,8 +29,6 @@ function spinRoulette() {
   spinBtn.disabled = true;
   resultDiv.textContent = '';
 
-  renderPrizes();
-
   const prizeCount = prizes.length;
   const prizeWidth = getPrizeWidth();
   const visibleCount = Math.floor(roulette.parentElement.offsetWidth / prizeWidth);
@@ -40,12 +36,21 @@ function spinRoulette() {
 
   // Выбираем случайный приз
   const randomIndex = Math.floor(Math.random() * prizeCount);
-  const stopIndex = prizeCount + randomIndex;
-
   // Количество полных кругов (5-7)
   const rounds = Math.floor(Math.random() * 3) + 5; // 5, 6 или 7
   const totalSteps = rounds * prizeCount + randomIndex;
-  const offset = (prizeCount + totalSteps - centerIndex) * prizeWidth;
+  // Длина extended-массива: все шаги + видимая часть + запас
+  const extendedLength = totalSteps + visibleCount + 2;
+  let extendedPrizes = [];
+  while (extendedPrizes.length < extendedLength) {
+    extendedPrizes = extendedPrizes.concat(prizes);
+  }
+  extendedPrizes = extendedPrizes.slice(0, extendedLength);
+
+  renderPrizes(extendedPrizes);
+
+  // Смещение для остановки на нужном призе
+  const offset = (totalSteps - centerIndex) * prizeWidth;
 
   // Быстрая анимация (2 секунды), всегда вправо
   roulette.style.transition = 'transform 2s cubic-bezier(0.15, 0.85, 0.35, 1)';
@@ -92,5 +97,20 @@ function spinRoulette() {
   }, 2000);
 }
 
-renderPrizes();
+// Первичная отрисовка (по умолчанию 3 круга)
+(function(){
+  const prizeCount = prizes.length;
+  const prizeWidth = getPrizeWidth();
+  const visibleCount = Math.floor(roulette.parentElement.offsetWidth / prizeWidth);
+  const rounds = 3;
+  const totalSteps = rounds * prizeCount;
+  const extendedLength = totalSteps + visibleCount + 2;
+  let extendedPrizes = [];
+  while (extendedPrizes.length < extendedLength) {
+    extendedPrizes = extendedPrizes.concat(prizes);
+  }
+  extendedPrizes = extendedPrizes.slice(0, extendedLength);
+  renderPrizes(extendedPrizes);
+})();
+
 spinBtn.addEventListener('click', spinRoulette);
