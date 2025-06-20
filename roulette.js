@@ -31,7 +31,6 @@ function spinRoulette() {
   spinBtn.disabled = true;
   resultDiv.textContent = '';
 
-  // Рендерим extended призы для анимации
   renderPrizes();
 
   const prizeCount = prizes.length;
@@ -39,19 +38,42 @@ function spinRoulette() {
   const visibleCount = Math.floor(roulette.parentElement.offsetWidth / prizeWidth);
   const centerIndex = Math.floor(visibleCount / 2);
 
-  // Выбираем случайный приз
   const randomIndex = Math.floor(Math.random() * prizeCount);
   const stopIndex = prizeCount + randomIndex;
   const offset = (stopIndex - centerIndex) * prizeWidth;
 
-  // Для плавной анимации с равномерным замедлением используем cubic-bezier
   roulette.style.transition = 'transform 4s cubic-bezier(0.15, 0.85, 0.35, 1)';
   roulette.style.transform = `translateX(-${offset}px)`;
 
   setTimeout(() => {
-    // Надёжно определяем индекс выигрыша
-    const prizeIndexUnderPointer = randomIndex;
-    const prizeUnderPointer = prizes[prizeIndexUnderPointer];
+    // Получаем координаты pointer
+    const pointer = document.querySelector('.pointer');
+    const pointerRect = pointer.getBoundingClientRect();
+    // Получаем все призы
+    const prizeDivs = document.querySelectorAll('.prize');
+    let foundPrize = null;
+    prizeDivs.forEach(div => {
+      const rect = div.getBoundingClientRect();
+      // Проверяем, находится ли центр pointer внутри div
+      if (
+        pointerRect.left >= rect.left &&
+        pointerRect.left <= rect.right
+      ) {
+        foundPrize = div.textContent;
+      }
+    });
+
+    // Находим приз по тексту
+    let prizeUnderPointer = null;
+    if (foundPrize) {
+      prizeUnderPointer = prizes.find(prize => foundPrize.startsWith(prize.name));
+    }
+
+    // Фолбэк, если не найдено (на всякий случай)
+    if (!prizeUnderPointer) {
+      prizeUnderPointer = prizes[randomIndex % prizeCount];
+    }
+
     resultDiv.textContent = `Вы выиграли: ${prizeUnderPointer.name} (${prizeUnderPointer.price}₽)!`;
 
     // Отправка результата в Telegram WebApp
