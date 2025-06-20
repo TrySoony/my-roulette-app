@@ -39,8 +39,8 @@ function spinRoulette() {
   roulette.style.transform = `translateX(-${offset}px)`;
 
   setTimeout(() => {
-    // Вычисляем индекс приза под pointer после остановки
-    const prizeIndexUnderPointer = (stopIndex - centerIndex) % prizeCount;
+    // Вычисляем индекс приза под pointer после остановки (гарантируем положительный индекс)
+    const prizeIndexUnderPointer = ((stopIndex - centerIndex) % prizeCount + prizeCount) % prizeCount;
     const prizeUnderPointer = prizes[prizeIndexUnderPointer];
     resultDiv.textContent = `Вы выиграли: ${prizeUnderPointer.name} (${prizeUnderPointer.price}₽)!`;
 
