@@ -34,12 +34,9 @@ function spinRoulette() {
   const visibleCount = Math.floor(roulette.parentElement.offsetWidth / prizeWidth);
   const centerIndex = Math.floor(visibleCount / 2);
 
-  // Выбираем случайный приз
   const randomIndex = Math.floor(Math.random() * prizeCount);
-  // Количество полных кругов (5-7)
-  const rounds = Math.floor(Math.random() * 3) + 5; // 5, 6 или 7
+  const rounds = Math.floor(Math.random() * 3) + 5;
   const totalSteps = rounds * prizeCount + randomIndex;
-  // Длина extended-массива: все шаги + видимая часть + запас
   const extendedLength = totalSteps + visibleCount + 2;
   let extendedPrizes = [];
   while (extendedPrizes.length < extendedLength) {
@@ -49,12 +46,18 @@ function spinRoulette() {
 
   renderPrizes(extendedPrizes);
 
-  // Смещение для остановки на нужном призе
   const offset = (totalSteps - centerIndex) * prizeWidth;
 
-  // Быстрая анимация (2 секунды), всегда вправо
-  roulette.style.transition = 'transform 2s cubic-bezier(0.15, 0.85, 0.35, 1)';
-  roulette.style.transform = `translateX(-${offset}px)`;
+  // Сброс transform и transition (моментально)
+  roulette.style.transition = 'none';
+  roulette.style.transform = 'translateX(0px)';
+
+  // Даем браузеру применить сброс (через requestAnimationFrame)
+  requestAnimationFrame(() => {
+    // Теперь задаём анимацию вправо
+    roulette.style.transition = 'transform 2s cubic-bezier(0.15, 0.85, 0.35, 1)';
+    roulette.style.transform = `translateX(-${offset}px)`;
+  });
 
   setTimeout(() => {
     // Получаем координаты pointer
