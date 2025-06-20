@@ -20,12 +20,11 @@ body {
   display: flex;
   transition: transform 4s cubic-bezier(0.25, 0.1, 0.25, 1);
   height: 120px;
-  gap: 0;
+  gap: 4px;
 }
 
 .prize {
-  flex: 1 0 0;
-  min-width: 0;
+  width: 120px;
   height: 100px;
   margin: 0;
   background: #444;
@@ -36,6 +35,9 @@ body {
   font-size: 18px;
   color: #fff;
   border: 2px solid #888;
+  box-sizing: border-box;
+  white-space: pre-line;
+  text-align: center;
 }
 
 .pointer {
