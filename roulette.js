@@ -18,7 +18,9 @@ function spinRoulette() {
   spinBtn.disabled = true;
   resultDiv.textContent = '';
   const prizeCount = prizes.length;
-  const prizeWidth = 120; // ширина .prize + margin
+  const prizeWidth = document.querySelector('.prize').offsetWidth + 
+                   parseInt(getComputedStyle(document.querySelector('.prize')).marginLeft) + 
+                   parseInt(getComputedStyle(document.querySelector('.prize')).marginRight);
   const randomIndex = Math.floor(Math.random() * prizeCount);
   const stopIndex = prizeCount + randomIndex;
   const offset = stopIndex * prizeWidth - (roulette.parentElement.offsetWidth / 2) + (prizeWidth / 2);
