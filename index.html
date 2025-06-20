@@ -7,14 +7,61 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
-  <h1>🎁 Рулетка подарков</h1>
-  <div class="roulette-container">
-    <div id="roulette" class="roulette"></div>
-    <div class="pointer"></div>
+  <div id="tab-content-roulette" class="tab-content active">
+    <h1>🎁 Рулетка подарков</h1>
+    <div class="roulette-container">
+      <div id="roulette" class="roulette"></div>
+      <div class="pointer"></div>
+    </div>
+    <button id="spin">Крутить!</button>
+    <div id="result"></div>
   </div>
-  <button id="spin">Крутить!</button>
-  <div id="result"></div>
+  <div id="tab-content-gifts" class="tab-content" style="display:none">
+    <h1>🎁 Мои подарки</h1>
+    <ul id="my-gifts-list">
+      <!-- Здесь будут отображаться подарки -->
+    </ul>
+    <button id="withdraw-btn">Вывести в Telegram</button>
+  </div>
+  <div id="tab-content-info" class="tab-content" style="display:none">
+    <h1>ℹ️ Информация</h1>
+    <p>Это приложение для розыгрыша подарков через Telegram-бота.</p>
+    <p>Здесь вы можете крутить рулетку, выигрывать призы и выводить их обратно в бота.</p>
+  </div>
+  <div class="bottom-tabs">
+    <button class="tab-btn active" data-tab="roulette">Рулетка</button>
+    <button class="tab-btn" data-tab="gifts">Мои подарки</button>
+    <button class="tab-btn" data-tab="info">Информация</button>
+  </div>
   <script src="prizes.js"></script>
   <script src="roulette.js"></script>
+  <script>
+    // Переключение вкладок
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabContents = {
+      roulette: document.getElementById('tab-content-roulette'),
+      gifts: document.getElementById('tab-content-gifts'),
+      info: document.getElementById('tab-content-info')
+    };
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        // Снимаем активность со всех кнопок
+        tabBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        // Скрываем все секции
+        Object.values(tabContents).forEach(tc => tc.style.display = 'none');
+        // Показываем нужную
+        tabContents[btn.dataset.tab].style.display = '';
+      });
+    });
+    // Кнопка вывода в Telegram
+    document.getElementById('withdraw-btn').onclick = function() {
+      if (window.Telegram && Telegram.WebApp) {
+        Telegram.WebApp.close();
+      } else {
+        alert('Откройте приложение через Telegram');
+      }
+    };
+  </script>
 </body>
 </html>
