@@ -18,12 +18,12 @@ function spinRoulette() {
   spinBtn.disabled = true;
   resultDiv.textContent = '';
   const prizeCount = prizes.length;
-  const prizeWidth = document.querySelector('.prize').offsetWidth + 
-                   parseInt(getComputedStyle(document.querySelector('.prize')).marginLeft) + 
-                   parseInt(getComputedStyle(document.querySelector('.prize')).marginRight);
+  const prizeWidth = 120; // или вычисляйте динамически, как выше
+  const visibleCount = 5; // у вас видно 5 призов
+  const centerIndex = Math.floor(visibleCount / 2);
   const randomIndex = Math.floor(Math.random() * prizeCount);
   const stopIndex = prizeCount + randomIndex;
-  const offset = stopIndex * prizeWidth - (roulette.parentElement.offsetWidth / 2) + (prizeWidth / 2);
+  const offset = (stopIndex - centerIndex) * prizeWidth;
 
   roulette.style.transition = 'transform 4s cubic-bezier(0.25, 0.1, 0.25, 1)';
   roulette.style.transform = `translateX(-${offset}px)`;
