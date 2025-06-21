@@ -33,9 +33,33 @@ h1 {
 
 .roulette {
   display: flex;
-  transition: transform 4s cubic-bezier(0.25, 0.1, 0.25, 1);
   height: 120px;
   gap: 8px;
+}
+
+/* Новый класс для запуска анимации */
+.roulette.spinning {
+  /* Новая кривая: очень быстрый старт, плавное замедление */
+  animation: spinAnimation 5s cubic-bezier(0.1, 0.8, 0.2, 1) forwards;
+}
+
+@keyframes spinAnimation {
+  0% {
+    transform: translateX(0);
+    filter: blur(0px);
+  }
+  15% {
+    /* Добавляем размытие в начале быстрой фазы */
+    filter: blur(1.5px);
+  }
+  85% {
+    /* Убираем размытие к концу, когда рулетка замедляется */
+    filter: blur(0.5px);
+  }
+  100% {
+    transform: translateX(var(--spin-offset, 0px));
+    filter: blur(0px);
+  }
 }
 
 .prize {
@@ -214,6 +238,44 @@ ul#my-gifts-list {
   margin: 0;
 }
 
+/* Анимация для выигранного приза */
+.prize.prize-won {
+  animation: prize-pop 0.5s ease-out forwards;
+  transform-origin: center center;
+  z-index: 10;
+  position: relative;
+}
+
+@keyframes prize-pop {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 10px #f8bbd0;
+  }
+  50% {
+    transform: scale(1.15);
+    box-shadow: 0 0 25px #e91e63;
+  }
+  100% {
+    transform: scale(1.1);
+    box-shadow: 0 0 15px #e91e63;
+  }
+}
+
+/* Анимация для текста результата */
+#result {
+  min-height: 1.5em; /* Резервируем место, чтобы не было прыжка */
+}
+#result.won {
+  animation: text-fade-in 0.5s ease-out;
+}
+
+@keyframes text-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
 @media (max-width: 500px) {
   .roulette-container {
     width: 98vw;

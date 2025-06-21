@@ -60,6 +60,11 @@ function spinRoulette() {
   if (!isSpinAvailable()) return;
   incAttempts();
   updateSpinBtnState();
+
+  // Сбрасываем старые анимации перед новым запуском
+  document.querySelectorAll('.prize.prize-won').forEach(el => el.classList.remove('prize-won'));
+  resultDiv.classList.remove('won');
+  roulette.classList.remove('spinning');
   resultDiv.textContent = '';
 
   const prizeCount = prizes.length;
@@ -81,15 +86,12 @@ function spinRoulette() {
 
   const offset = (totalSteps - centerIndex) * prizeWidth;
 
-  // Сброс transform и transition (моментально)
-  roulette.style.transition = 'none';
-  roulette.style.transform = 'translateX(0px)';
-
-  // Даем браузеру применить сброс (через requestAnimationFrame)
+  // Даем браузеру применить сброс классов перед добавлением нового
   requestAnimationFrame(() => {
-    // Теперь задаём анимацию вправо
-    roulette.style.transition = 'transform 5s cubic-bezier(0.15, 0.85, 0.35, 1)';
-    roulette.style.transform = `translateX(-${offset}px)`;
+    // Устанавливаем конечную точку как CSS-переменную
+    roulette.style.setProperty('--spin-offset', `-${offset}px`);
+    // Добавляем класс для запуска анимации в CSS
+    roulette.classList.add('spinning');
   });
 
   setTimeout(() => {
@@ -98,33 +100,41 @@ function spinRoulette() {
     const pointerRect = pointer.getBoundingClientRect();
     // Получаем все призы
     const prizeDivs = document.querySelectorAll('.prize');
-    let foundPrize = null;
+    let winningDiv = null;
+    let foundPrizeText = null;
+
     prizeDivs.forEach(div => {
       const rect = div.getBoundingClientRect();
-      // Проверяем, находится ли центр pointer внутри div
       if (
         pointerRect.left >= rect.left &&
-        pointerRect.left <= rect.right
+        pointerRect.right >= pointerRect.right
       ) {
-        // prize.name теперь в .prize-name
-        foundPrize = div.querySelector('.prize-name').textContent;
+        winningDiv = div;
+        foundPrizeText = div.querySelector('.prize-name').textContent;
       }
     });
 
     // Находим приз по названию
     let prizeUnderPointer = null;
-    if (foundPrize) {
-      prizeUnderPointer = prizes.find(prize => foundPrize === prize.name);
+    if (foundPrizeText) {
+      prizeUnderPointer = prizes.find(prize => foundPrizeText === prize.name);
     }
 
     // Фолбэк, если не найдено (на всякий случай)
     if (!prizeUnderPointer) {
       prizeUnderPointer = prizes[randomIndex % prizeCount];
     }
+    
+    // Добавляем класс для анимации текста результата
+    resultDiv.classList.add('won');
 
     if (prizeUnderPointer.starPrice > 0) {
       resultDiv.textContent = `Вы выиграли: ${prizeUnderPointer.name} (${prizeUnderPointer.starPrice}⭐)!`;
       saveGift(prizeUnderPointer);
+      // Добавляем класс для анимации выигранного приза
+      if (winningDiv) {
+        winningDiv.classList.add('prize-won');
+      }
     } else {
       resultDiv.textContent = `Вы ничего не выиграли.`;
     }
@@ -132,16 +142,11 @@ function spinRoulette() {
     // Отправка результата в Telegram WebApp
     if (window.Telegram && Telegram.WebApp) {
       Telegram.WebApp.sendData(JSON.stringify({prize: prizeUnderPointer}));
-      Telegram.WebApp.close();
+      // Не закрываем сразу, чтобы пользователь увидел результат
+      // Telegram.WebApp.close(); 
     }
 
-    spinBtn.disabled = !isSpinAvailable();
-    if (!isSpinAvailable()) {
-      spinBtn.textContent = 'Попытки закончились';
-    } else {
-      spinBtn.textContent = 'Крутить!';
-    }
-  }, 5000);
+  }, 5000); // Таймер должен совпадать с длительностью анимации
 }
 
 // Сохраняем выигранный приз
