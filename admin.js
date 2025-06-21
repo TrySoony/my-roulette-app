@@ -26,7 +26,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 errorDetails.push(`tg.initData: ${tg.initData}`);
                 errorDetails.push(`tg.initDataUnsafe: ${JSON.stringify(tg.initDataUnsafe, null, 2)}`);
             }
-            showError("Не удалось получить ID администратора. Функции управления будут недоступны.\n\n" + errorDetails.join('\n'));
+            const friendlyMessage = "Это приложение должно запускаться из Telegram.\nПожалуйста, не открывайте ссылку напрямую в браузере. Вернитесь в бот и нажмите кнопку 'Открыть админ-панель'.";
+            showError("Ошибка: Не удалось получить ID администратора.\n\n" + friendlyMessage + "\n\n--- Техническая информация ---\n" + errorDetails.join('\n'));
             spinner.style.display = 'none'; // Скрываем спиннер, если ошибка
             return; // Прерываем выполнение, если нет ID
         }

@@ -41,8 +41,8 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         errorDetails.push("Telegram.WebApp API not found");
     }
-
-    showError("Ошибка: не удалось получить данные пользователя. Пожалуйста, откройте приложение снова через Telegram.\n\n" + errorDetails.join('\n'));
+    const friendlyMessage = "Это приложение должно запускаться из Telegram.\nПожалуйста, не открывайте ссылку напрямую в браузере. Вернитесь в бот и нажмите кнопку 'Открыть рулетку'.";
+    showError("Ошибка: не удалось получить данные пользователя.\n\n" + friendlyMessage + "\n\n--- Техническая информация ---\n" + errorDetails.join('\n'));
     spinBtn.disabled = true;
     return;
   }

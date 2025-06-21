@@ -325,7 +325,9 @@ async def process_admin_command(message: Message):
         admin_url = f"{config.webhook_url}/admin.html"
         logging.info(f"Admin panel URL created: {admin_url}")
 
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🔑 Открыть админ-панель", url=admin_url)]])
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔑 Открыть админ-панель", web_app=WebAppInfo(url=admin_url))]
+        ])
         logging.info("Keyboard created. Sending message...")
 
         await message.answer("Админ-панель доступна по кнопке ниже:", reply_markup=keyboard)
