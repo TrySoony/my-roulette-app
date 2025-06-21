@@ -375,3 +375,65 @@ ul#my-gifts-list {
     height: 100px;
   }
 }
+
+/* Стили для модального окна */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+.modal-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+.modal-content {
+  background: #fff;
+  padding: 30px;
+  border-radius: 20px;
+  text-align: center;
+  width: 90%;
+  max-width: 350px;
+  transform: scale(0.9);
+  transition: transform 0.3s ease;
+}
+.modal-overlay.visible .modal-content {
+  transform: scale(1);
+}
+#win-modal-img {
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
+  margin-bottom: 15px;
+}
+#win-modal-title {
+  font-size: 1.8rem;
+  color: #333;
+  margin: 0 0 10px;
+}
+#win-modal-price {
+  font-size: 1.2rem;
+  color: #e91e63;
+  font-weight: bold;
+  margin: 0 0 25px;
+}
+#win-modal-btn {
+  background: #e91e63;
+  color: #fff;
+  padding: 12px 25px;
+  border: none;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  width: 100%;
+}

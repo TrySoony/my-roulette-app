@@ -78,6 +78,37 @@ function launchConfetti() {
   }, 250);
 }
 
+// Управление модальным окном
+const winModalOverlay = document.getElementById('win-modal-overlay');
+const winModalImg = document.getElementById('win-modal-img');
+const winModalTitle = document.getElementById('win-modal-title');
+const winModalPrice = document.getElementById('win-modal-price');
+const winModalBtn = document.getElementById('win-modal-btn');
+
+function showWinModal(prize) {
+  winModalImg.src = prize.img;
+  winModalTitle.textContent = prize.name;
+  winModalPrice.textContent = `${prize.starPrice}⭐`;
+  winModalOverlay.classList.add('visible');
+  launchConfetti(); // Запускаем конфетти вместе с окном
+}
+
+function hideWinModal() {
+  winModalOverlay.classList.remove('visible');
+}
+
+// Закрытие модального окна
+winModalOverlay.addEventListener('click', (e) => {
+  if (e.target === winModalOverlay) {
+    hideWinModal();
+  }
+});
+winModalBtn.addEventListener('click', () => {
+  hideWinModal();
+  // Переключаемся на вкладку "Мои подарки"
+  document.querySelector('.tab-btn[data-tab="gifts"]').click();
+});
+
 function spinRoulette() {
   if (!isSpinAvailable()) return;
   incAttempts();
@@ -153,8 +184,7 @@ function spinRoulette() {
     if (prizeUnderPointer.starPrice > 0) {
       resultDiv.textContent = `Вы выиграли: ${prizeUnderPointer.name} (${prizeUnderPointer.starPrice}⭐)!`;
       saveGift(prizeUnderPointer);
-      // Запускаем конфетти!
-      launchConfetti();
+      showWinModal(prizeUnderPointer); // Показываем модальное окно
       // Добавляем класс для анимации выигранного приза
       if (winningDiv) {
         winningDiv.classList.add('prize-won');
