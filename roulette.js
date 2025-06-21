@@ -35,12 +35,36 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   if (telegramUser && telegramUser.id) {
-    fetchUserStatus(telegramUser.id);
+    // Сначала "анонсируем" пользователя серверу, чтобы он создал запись, если ее нет.
+    // И только потом запрашиваем его статус.
+    announceUser(telegramUser.id).then(() => {
+      fetchUserStatus(telegramUser.id);
+    });
   } else {
     // Пользователь не авторизован в Telegram, можно показать ошибку
     document.body.innerHTML = '<h1>Ошибка: не удалось получить данные пользователя. Откройте приложение через Telegram.</h1>';
   }
 });
+
+// Новая функция для создания/анонсирования пользователя на сервере
+async function announceUser(userId) {
+  try {
+    const response = await fetch('/api/user', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      console.error('Failed to announce user:', data.error);
+    } else {
+      console.log('User announced successfully:', data.message);
+      currentUser.id = userId; // Устанавливаем ID текущего пользователя
+    }
+  } catch (error) {
+    console.error("Error announcing user:", error);
+  }
+}
 
 // Получаем статус пользователя с сервера
 async function fetchUserStatus(userId) {
