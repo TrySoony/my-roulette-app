@@ -1,90 +1,182 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Инициализируем Telegram WebApp
-    if (window.Telegram && Telegram.WebApp) {
-        Telegram.WebApp.ready();
-        const user = Telegram.WebApp.initDataUnsafe.user;
-        if (user && user.id) {
-            fetchAdminData(user.id);
-        } else {
-            document.body.innerHTML = '<h1>Ошибка: Не удалось получить ID пользователя. Пожалуйста, откройте эту страницу через вашего Telegram-бота.</h1>';
+    const userList = document.getElementById('user-list');
+    const spinner = document.querySelector('.spinner-container');
+    const modal = document.getElementById('add-prize-modal');
+    const closeModalButton = document.querySelector('.close-button');
+    const addPrizeForm = document.getElementById('add-prize-form');
+    const modalUserIdInput = document.getElementById('modal-user-id');
+    
+    let adminId = null;
+
+    // Инициализация
+    if (window.Telegram && window.Telegram.WebApp) {
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+            adminId = tg.initDataUnsafe.user.id;
         }
-    } else {
-        document.body.innerHTML = '<h1>Ошибка: Это приложение должно быть запущено внутри Telegram.</h1>';
-        // Для отладки можно использовать фейковый ID
-        // const fakeAdminId = 123456789; 
-        // fetchAdminData(fakeAdminId);
     }
-});
+    
+    if (!adminId) {
+        showError("Не удалось получить ID администратора. Функции управления будут недоступны.");
+    }
 
-async function fetchAdminData(adminId) {
-    try {
-        // Запрашиваем оба типа данных, передавая ID админа
-        const [connectionsRes, userDataRes] = await Promise.all([
-            fetch(`/api/admin/connections?user_id=${adminId}`),
-            fetch(`/api/admin/user_data?user_id=${adminId}`)
-        ]);
+    async function fetchData() {
+        spinner.style.display = 'flex';
+        userList.innerHTML = '';
+        try {
+            const response = await fetch('/api/admin/user_data');
+            const users = await response.json();
+            if (Object.keys(users).length === 0) {
+                 userList.innerHTML = '<p class="empty-state">Пока что нет данных об игроках.</p>';
+            } else {
+                renderUsers(users);
+            }
+        } catch (error) {
+            console.error('Ошибка при загрузке данных пользователей:', error);
+            showError("Не удалось загрузить данные пользователей.");
+        } finally {
+            spinner.style.display = 'none';
+        }
+    }
 
-        if (connectionsRes.status === 403 || userDataRes.status === 403) {
-            document.body.innerHTML = '<h1>Доступ запрещен. Эту панель может просматривать только администратор.</h1>';
+    function renderUsers(users) {
+        userList.innerHTML = '';
+        for (const userId in users) {
+            const userData = users[userId];
+            const userCard = document.createElement('div');
+            userCard.className = 'user-card';
+            userCard.dataset.userId = userId;
+
+            const giftsHTML = userData.gifts.map((gift, index) => `
+                <li class="gift-item">
+                    <img src="${gift.img || 'images/default_gift.png'}" class="gift-image" alt="prize">
+                    <span>${gift.name} (${gift.starPrice}★) - ${gift.date}</span>
+                    <button class="button danger small remove-gift-btn" data-index="${index}">Удалить</button>
+                </li>
+            `).join('');
+
+            userCard.innerHTML = `
+                <div class="user-card-header">
+                    <h3>ID: ${userId}</h3>
+                    <div class="user-actions">
+                         <button class="button primary small add-prize-btn">Выдать приз</button>
+                         <button class="button secondary small add-attempt-btn">+1 Попытка</button>
+                    </div>
+                </div>
+                <div class="user-card-body">
+                    <p>Попыток использовано: <span class="attempts-count">${userData.attempts}</span></p>
+                    <h4>Призы:</h4>
+                    <ul class="gift-list">${giftsHTML || '<p>Нет призов</p>'}</ul>
+                </div>
+            `;
+            userList.appendChild(userCard);
+        }
+    }
+
+    // Обработчики событий
+    userList.addEventListener('click', (e) => {
+        const userId = e.target.closest('.user-card')?.dataset.userId;
+        if (!userId) return;
+
+        if (e.target.classList.contains('add-attempt-btn')) {
+            addAttempt(userId);
+        }
+        if (e.target.classList.contains('remove-gift-btn')) {
+            const giftIndex = parseInt(e.target.dataset.index, 10);
+            removeGift(userId, giftIndex);
+        }
+        if(e.target.classList.contains('add-prize-btn')) {
+            openAddPrizeModal(userId);
+        }
+    });
+
+    closeModalButton.onclick = () => modal.style.display = "none";
+    window.onclick = (event) => {
+        if (event.target == modal) {
+            modal.style.display = "none";
+        }
+    }
+
+    addPrizeForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const userId = modalUserIdInput.value;
+        const prize = {
+            name: document.getElementById('prize-name').value,
+            starPrice: parseInt(document.getElementById('prize-price').value, 10),
+            img: document.getElementById('prize-img').value
+        };
+        await addPrize(userId, prize);
+        modal.style.display = "none";
+        addPrizeForm.reset();
+    });
+    
+    function openAddPrizeModal(userId) {
+        modalUserIdInput.value = userId;
+        modal.style.display = "flex";
+    }
+
+    // Функции API
+    async function apiCall(endpoint, body) {
+        if (!adminId) {
+            showError("Действие невозможно: ID администратора не найден.");
             return;
         }
-
-        if (connectionsRes.ok) {
-            const connections = await connectionsRes.json();
-            renderConnections(connections);
-        } else {
-            console.error('Failed to load connections');
+        try {
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...body, admin_id: adminId })
+            });
+            if (!response.ok) {
+                 const error = await response.json();
+                 throw new Error(error.error || 'Ошибка сервера');
+            }
+            return await response.json();
+        } catch (error) {
+            console.error(`Ошибка при вызове ${endpoint}:`, error);
+            showError(error.message);
         }
+    }
 
-        if (userDataRes.ok) {
-            const userData = await userDataRes.json();
-            renderUserData(userData);
-        } else {
-            console.error('Failed to load user data');
+    async function addAttempt(userId) {
+        const result = await apiCall('/api/admin/add_attempt', { user_id: userId });
+        if (result && result.success) {
+            // Обновляем UI
+            const attemptsSpan = document.querySelector(`.user-card[data-user-id="${userId}"] .attempts-count`);
+            if (attemptsSpan) attemptsSpan.textContent = result.attempts;
+            showSuccess("Попытка добавлена!");
         }
-
-    } catch (error) {
-        console.error('Error fetching admin data:', error);
     }
-}
 
-function renderConnections(connections) {
-    const tableBody = document.querySelector('#connections-table tbody');
-    if (!connections || connections.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="3">Нет активных подключений.</td></tr>';
-        return;
+    async function removeGift(userId, giftIndex) {
+        if (!confirm('Вы уверены, что хотите удалить этот приз?')) return;
+        const result = await apiCall('/api/admin/remove_gift', { user_id: userId, gift_index: giftIndex });
+        if (result && result.success) {
+            // Просто перезагружаем все данные для простоты
+            fetchData();
+            showSuccess("Приз удален!");
+        }
     }
-    tableBody.innerHTML = connections.map(conn => `
-        <tr>
-            <td>${conn.user_id}</td>
-            <td>${conn.username || 'N/A'}</td>
-            <td>${conn.business_connection_id}</td>
-        </tr>
-    `).join('');
-}
 
-function renderUserData(userData) {
-    const container = document.getElementById('user-data-container');
-    if (Object.keys(userData).length === 0) {
-        container.innerHTML = '<p>Нет данных о пользователях.</p>';
-        return;
+    async function addPrize(userId, prize) {
+        const result = await apiCall('/api/admin/add_prize', { user_id: userId, prize: prize });
+        if (result && result.success) {
+            fetchData();
+            showSuccess("Приз выдан!");
+        }
     }
-    container.innerHTML = Object.entries(userData).map(([userId, data]) => `
-        <div class="user-card">
-            <h3>User ID: ${userId}</h3>
-            <p>Попыток сделано: ${data.attempts}</p>
-            <h4>Выигранные призы:</h4>
-            ${data.gifts.length > 0 ? `
-                <ul class="admin-prize-list">
-                    ${data.gifts.map(gift => `
-                        <li>
-                            <img src="${gift.img}" alt="${gift.name}">
-                            <span>${gift.name} (${gift.starPrice}⭐)</span>
-                            <small>Выигран: ${gift.date}</small>
-                        </li>
-                    `).join('')}
-                </ul>
-            ` : '<p>Нет призов.</p>'}
-        </div>
-    `).join('');
-} 
+    
+    function showError(message) {
+        // Можно заменить на красивую нотификацию
+        alert(`Ошибка: ${message}`);
+    }
+    
+    function showSuccess(message) {
+        // Можно заменить на красивую нотификацию
+        alert(`Успех: ${message}`);
+    }
+
+    fetchData();
+}); 

@@ -701,6 +701,81 @@ async def reset_webhook(message: Message):
     else:
         await message.answer("Ошибка: WEBHOOK_URL не настроен.")
 
+# --- Новые API эндпоинты для админки ---
+
+def admin_request_is_valid(request_data):
+    """Проверяет, что запрос содержит валидный ID администратора."""
+    if not request_data or 'admin_id' not in request_data:
+        return False
+    try:
+        is_admin = int(request_data['admin_id']) == ADMIN_ID
+        return is_admin
+    except (ValueError, TypeError):
+        return False
+
+@flask_app.route('/api/admin/add_attempt', methods=['POST'])
+def add_attempt():
+    data = request.json
+    if not admin_request_is_valid(data):
+        return jsonify({"error": "Unauthorized"}), 403
+    
+    user_id = str(data.get('user_id'))
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+
+    all_data = read_user_data()
+    if user_id in all_data and all_data[user_id]['attempts'] > 0:
+        all_data[user_id]['attempts'] -= 1 # Логика обратная, мы "возвращаем" попытку
+        write_user_data(all_data)
+        return jsonify({"success": True, "attempts": all_data[user_id]['attempts']})
+    return jsonify({"error": "User not found or has no attempts to add back"}), 404
+
+
+@flask_app.route('/api/admin/remove_gift', methods=['POST'])
+def remove_gift():
+    data = request.json
+    if not admin_request_is_valid(data):
+        return jsonify({"error": "Unauthorized"}), 403
+        
+    user_id = str(data.get('user_id'))
+    gift_index = data.get('gift_index')
+
+    if not user_id or gift_index is None:
+        return jsonify({"error": "user_id and gift_index are required"}), 400
+
+    all_data = read_user_data()
+    if user_id in all_data and 0 <= gift_index < len(all_data[user_id]['gifts']):
+        all_data[user_id]['gifts'].pop(gift_index)
+        write_user_data(all_data)
+        return jsonify({"success": True})
+    return jsonify({"error": "User or gift not found"}), 404
+
+@flask_app.route('/api/admin/add_prize', methods=['POST'])
+def add_prize():
+    data = request.json
+    if not admin_request_is_valid(data):
+        return jsonify({"error": "Unauthorized"}), 403
+    
+    user_id = str(data.get('user_id'))
+    prize = data.get('prize')
+
+    if not user_id or not prize or 'name' not in prize:
+        return jsonify({"error": "user_id and prize object are required"}), 400
+    
+    all_data = read_user_data()
+    if user_id not in all_data:
+        all_data[user_id] = {"attempts": 0, "gifts": []}
+
+    new_gift = {
+        "name": prize.get("name"),
+        "starPrice": prize.get("starPrice", 0),
+        "img": prize.get("img", ""),
+        "date": datetime.now().strftime('%d.%m.%Y')
+    }
+    all_data[user_id]['gifts'].append(new_gift)
+    write_user_data(all_data)
+    return jsonify({"success": True, "new_gift": new_gift})
+
 # --- "Склеиваем" два приложения ---
 # FastAPI будет обрабатывать /webhook, а всё остальное передавать в Flask
 app.mount("/", WSGIMiddleware(flask_app))
