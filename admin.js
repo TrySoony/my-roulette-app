@@ -13,15 +13,29 @@ document.addEventListener('DOMContentLoaded', () => {
         const tg = window.Telegram.WebApp;
         tg.ready();
         tg.expand();
-        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+        if (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
             adminId = tg.initDataUnsafe.user.id;
+        } else {
+            // Формируем детальное сообщение об ошибке
+            let errorDetails = [];
+            if (!window.Telegram) {
+                errorDetails.push("window.Telegram is missing.");
+            } else if (!window.Telegram.WebApp) {
+                errorDetails.push("window.Telegram.WebApp is missing.");
+            } else {
+                errorDetails.push(`tg.initData: ${tg.initData}`);
+                errorDetails.push(`tg.initDataUnsafe: ${JSON.stringify(tg.initDataUnsafe, null, 2)}`);
+            }
+            showError("Не удалось получить ID администратора. Функции управления будут недоступны.\n\n" + errorDetails.join('\n'));
+            spinner.style.display = 'none'; // Скрываем спиннер, если ошибка
+            return; // Прерываем выполнение, если нет ID
         }
+    } else {
+        showError("Не удалось получить ID администратора. (Telegram.WebApp API not found)");
+        spinner.style.display = 'none'; // Скрываем спиннер, если ошибка
+        return; // Прерываем выполнение
     }
     
-    if (!adminId) {
-        showError("Не удалось получить ID администратора. Функции управления будут недоступны.");
-    }
-
     async function fetchData() {
         spinner.style.display = 'flex';
         userList.innerHTML = '';

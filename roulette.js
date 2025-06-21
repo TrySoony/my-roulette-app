@@ -8,6 +8,10 @@ let attemptsLeft = 0; // Храним оставшиеся попытки
 let userGifts = [];
 let telegramUser = null;
 
+function showError(message) {
+    alert(message);
+}
+
 // Более надежный способ получения данных пользователя
 function getTelegramUser() {
     if (window.Telegram && window.Telegram.WebApp) {
@@ -29,7 +33,16 @@ document.addEventListener('DOMContentLoaded', () => {
   telegramUser = getTelegramUser();
   
   if (!telegramUser) {
-    showError("Ошибка: не удалось получить данные пользователя. Откройте приложение через Telegram.");
+    let errorDetails = [];
+    if (window.Telegram && window.Telegram.WebApp) {
+        const tg = window.Telegram.WebApp;
+        errorDetails.push(`tg.initData: ${tg.initData}`);
+        errorDetails.push(`tg.initDataUnsafe: ${JSON.stringify(tg.initDataUnsafe, null, 2)}`);
+    } else {
+        errorDetails.push("Telegram.WebApp API not found");
+    }
+
+    showError("Ошибка: не удалось получить данные пользователя. Пожалуйста, откройте приложение снова через Telegram.\n\n" + errorDetails.join('\n'));
     spinBtn.disabled = true;
     return;
   }
