@@ -2,6 +2,7 @@
 Конфигурация для Telegram-бота рулетки подарков
 """
 import os
+import re
 from typing import Optional
 from dataclasses import dataclass
 
@@ -23,8 +24,13 @@ class Config:
         if self.admin_id <= 0:
             raise ValueError("ADMIN_ID должен быть положительным числом")
         
-        if not self.webhook_secret:
-            self.webhook_secret = self.bot_token
+        # Валидация секретного токена вебхука
+        if self.webhook_secret:
+            if not re.match(r"^[A-Za-z0-9_-]{1,256}$", self.webhook_secret):
+                raise ValueError(
+                    "WEBHOOK_SECRET содержит недопустимые символы. "
+                    "Разрешены только буквы (A-Z, a-z), цифры (0-9), дефис (-) и подчеркивание (_)."
+                )
 
 def load_config() -> Config:
     """Загружает конфигурацию из переменных окружения"""
