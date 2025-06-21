@@ -1,26 +1,44 @@
 const roulette = document.getElementById('roulette');
 const spinBtn = document.getElementById('spin');
 const resultDiv = document.getElementById('result');
+const giftsList = document.getElementById('gifts-list');
 
 let currentUser = {}; // Храним ID пользователя
 let attemptsLeft = 0; // Храним оставшиеся попытки
+let userGifts = [];
+let telegramUser = null;
+
+// Более надежный способ получения данных пользователя
+function getTelegramUser() {
+    if (window.Telegram && window.Telegram.WebApp) {
+        const tg = window.Telegram.WebApp;
+        // Расширяем область видимости кнопки "назад"
+        if (tg.BackButton.isVisible) {
+            tg.BackButton.hide();
+        }
+        tg.expand();
+        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+            return tg.initDataUnsafe.user;
+        }
+    }
+    return null;
+}
 
 // Инициализация приложения
 document.addEventListener('DOMContentLoaded', () => {
-  if (window.Telegram && Telegram.WebApp) {
-    Telegram.WebApp.ready();
-    currentUser = Telegram.WebApp.initDataUnsafe.user;
-    if (currentUser && currentUser.id) {
-      fetchUserStatus(currentUser.id);
-    } else {
-      // Пользователь не авторизован в Telegram, можно показать ошибку
-      document.body.innerHTML = '<h1>Ошибка: не удалось получить данные пользователя. Откройте приложение через Telegram.</h1>';
-    }
+  telegramUser = getTelegramUser();
+  
+  if (!telegramUser) {
+    showError("Ошибка: не удалось получить данные пользователя. Откройте приложение через Telegram.");
+    spinBtn.disabled = true;
+    return;
+  }
+
+  if (telegramUser && telegramUser.id) {
+    fetchUserStatus(telegramUser.id);
   } else {
-    // Для отладки в браузере
-    console.warn("Telegram WebApp is not available. Using mock user.");
-    currentUser = { id: 'mock_user_123' };
-    fetchUserStatus(currentUser.id);
+    // Пользователь не авторизован в Telegram, можно показать ошибку
+    document.body.innerHTML = '<h1>Ошибка: не удалось получить данные пользователя. Откройте приложение через Telegram.</h1>';
   }
 });
 
