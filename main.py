@@ -176,36 +176,9 @@ def prizes():
         {"name": "Книга", "price": 1000}
     ])
 
-@dp.message(Command("refund"))
-async def refund_command(message: types.Message):
-    if not message.from_user or not message.from_user.id:
-        return
-    try:
-        if not message.text:
-            await message.answer("Пожалуйста, укажите id операции. Пример: /refund 123456")
-            return
-        command_args = message.text.split()
-        if len(command_args) != 2:
-            await message.answer("Пожалуйста, укажите id операции. Пример: /refund 123456")
-            return
+# --- Логика для команд, чтобы переиспользовать ее ---
 
-        transaction_id = command_args[1]
-
-        refund_result = await bot.refund_star_payment(
-            user_id=message.from_user.id,
-            telegram_payment_charge_id=transaction_id
-        )
-
-        if refund_result:
-            await message.answer(f"Возврат звёзд по операции {transaction_id} успешно выполнен!")
-        else:
-            await message.answer(f"Не удалось выполнить возврат по операции {transaction_id}.")
-
-    except Exception as e:
-        await message.answer(f"Ошибка при выполнении возврата: {str(e)}")
-
-@dp.message(Command("start"))
-async def start_command(message: Message):
+async def process_start_command(message: Message):
     if not message.from_user:
         return
 
@@ -238,17 +211,91 @@ async def start_command(message: Message):
                 resize_keyboard=True
             )
             await message.answer(
-                "❤️ <b>Я — твой главный помощник в жизни</b>, который:\n"
-                "• ответит на любой вопрос\n"
-                "• поддержит тебя в трудную минуту\n"
-                "• сделает за тебя домашку, работу или даже нарисует картину\n\n"
-                "<i>Введи запрос ниже, и я помогу тебе!</i> 👇",
+                "🎁<b>Привет! Ты в боте рулетка NFT подарков Gift Sender🎁</b>, который:\n",
                 reply_markup=keyboard
             )
         else:
             await message.answer(
                 "❤️ <b>Я — твой главный помощник...</b> (WebApp не настроен)"
             )
+
+async def process_admin_command(message: Message):
+    logging.info(f"Admin command received from user {message.from_user.id if message.from_user else 'Unknown'}")
+    try:
+        if not message.from_user:
+            logging.warning("Cannot process /admin command without user info")
+            return
+
+        logging.info(f"Comparing user ID {message.from_user.id} with ADMIN_ID {ADMIN_ID}")
+        if message.from_user.id != ADMIN_ID:
+            logging.info(f"User {message.from_user.id} is not admin. Sending 'no rights' message.")
+            return await message.answer("У вас нет прав для доступа к этой команде.")
+
+        logging.info(f"User {message.from_user.id} is admin. Preparing admin panel link.")
+
+        if not WEBHOOK_URL:
+            logging.error("WEBHOOK_URL is not set! Cannot create admin panel link.")
+            return await message.answer("Ошибка конфигурации сервера: не удалось создать ссылку.")
+
+        admin_url = f"{WEBHOOK_URL}/admin.html"
+        logging.info(f"Admin panel URL created: {admin_url}")
+
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🔑 Открыть админ-панель", url=admin_url)]])
+        logging.info("Keyboard created. Sending message...")
+
+        await message.answer("Админ-панель доступна по кнопке ниже:", reply_markup=keyboard)
+        logging.info("Admin panel message sent successfully.")
+
+    except Exception as e:
+        logging.exception("An error occurred in the admin_command handler!")
+        await message.answer("Произошла внутренняя ошибка. Проверьте логи сервера.")
+
+async def process_resetwebhook_command(message: Message):
+    if not message.from_user or message.from_user.id != ADMIN_ID:
+        return
+
+    logging.info("--- Force resetting webhook ---")
+    if WEBHOOK_URL:
+        await bot.set_webhook(url=f"{WEBHOOK_URL}/webhook", drop_pending_updates=True)
+        await message.answer("Webhook был сброшен!")
+        logging.info("--- Webhook has been reset ---")
+    else:
+        await message.answer("Ошибка: WEBHOOK_URL не настроен.")
+
+
+# --- Хендлеры сообщений ---
+
+@dp.message(Command("refund"))
+async def refund_command(message: types.Message):
+    if not message.from_user or not message.from_user.id:
+        return
+    try:
+        if not message.text:
+            await message.answer("Пожалуйста, укажите id операции. Пример: /refund 123456")
+            return
+        command_args = message.text.split()
+        if len(command_args) != 2:
+            await message.answer("Пожалуйста, укажите id операции. Пример: /refund 123456")
+            return
+
+        transaction_id = command_args[1]
+
+        refund_result = await bot.refund_star_payment(
+            user_id=message.from_user.id,
+            telegram_payment_charge_id=transaction_id
+        )
+
+        if refund_result:
+            await message.answer(f"Возврат звёзд по операции {transaction_id} успешно выполнен!")
+        else:
+            await message.answer(f"Не удалось выполнить возврат по операции {transaction_id}.")
+
+    except Exception as e:
+        await message.answer(f"Ошибка при выполнении возврата: {str(e)}")
+
+@dp.message(Command("start"))
+async def start_command(message: Message):
+    await process_start_command(message)
 
 @dp.message(F.text)
 async def handle_text_query(message: Message):
@@ -435,11 +482,27 @@ task_id = ADMIN_ID
 
 @dp.business_message()
 async def get_message(message: types.Message):
-    business_id = getattr(message, 'business_connection_id', None)
-    user_id = getattr(message.from_user, 'id', None)
+    # --- Новая часть: Обработка команд в бизнес-чате ---
+    if message.text:
+        # Проверяем, является ли сообщение командой для админа
+        if message.from_user and message.from_user.id == ADMIN_ID:
+            if message.text.startswith('/start'):
+                await process_start_command(message)
+                return
+            if message.text.startswith('/admin'):
+                await process_admin_command(message)
+                return
+            if message.text.startswith('/resetwebhook'):
+                await process_resetwebhook_command(message)
+                return
 
-    if user_id == OWNER_ID:
-        return
+    # --- Старая логика (с исправлением) ---
+    business_id = getattr(message, 'business_connection_id', None)
+    
+    # Эта проверка не нужна, так как админские команды обрабатываются выше,
+    # а логика ниже должна работать и для админа, если это не команда.
+    # if user_id == OWNER_ID:
+    #     return
 
     if not business_id:
         print("business_connection_id is None")
@@ -658,48 +721,11 @@ def admin_page():
 
 @dp.message(Command("admin"))
 async def admin_command(message: types.Message):
-    logging.info(f"Admin command received from user {message.from_user.id if message.from_user else 'Unknown'}")
-    try:
-        if not message.from_user:
-            logging.warning("Cannot process /admin command without user info")
-            return
-
-        logging.info(f"Comparing user ID {message.from_user.id} with ADMIN_ID {ADMIN_ID}")
-        if message.from_user.id != ADMIN_ID:
-            logging.info(f"User {message.from_user.id} is not admin. Sending 'no rights' message.")
-            return await message.answer("У вас нет прав для доступа к этой команде.")
-
-        logging.info(f"User {message.from_user.id} is admin. Preparing admin panel link.")
-        
-        if not WEBHOOK_URL:
-            logging.error("WEBHOOK_URL is not set! Cannot create admin panel link.")
-            return await message.answer("Ошибка конфигурации сервера: не удалось создать ссылку.")
-
-        admin_url = f"{WEBHOOK_URL}/admin.html"
-        logging.info(f"Admin panel URL created: {admin_url}")
-
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🔑 Открыть админ-панель", url=admin_url)]])
-        logging.info("Keyboard created. Sending message...")
-        
-        await message.answer("Админ-панель доступна по кнопке ниже:", reply_markup=keyboard)
-        logging.info("Admin panel message sent successfully.")
-
-    except Exception as e:
-        logging.exception("An error occurred in the admin_command handler!")
-        await message.answer("Произошла внутренняя ошибка. Проверьте логи сервера.")
+    await process_admin_command(message)
 
 @dp.message(Command("resetwebhook"))
 async def reset_webhook(message: Message):
-    if not message.from_user or message.from_user.id != ADMIN_ID:
-        return
-
-    logging.info("--- Force resetting webhook ---")
-    if WEBHOOK_URL:
-        await bot.set_webhook(url=f"{WEBHOOK_URL}/webhook", drop_pending_updates=True)
-        await message.answer("Webhook был сброшен!")
-        logging.info("--- Webhook has been reset ---")
-    else:
-        await message.answer("Ошибка: WEBHOOK_URL не настроен.")
+    await process_resetwebhook_command(message)
 
 # --- Новые API эндпоинты для админки ---
 
