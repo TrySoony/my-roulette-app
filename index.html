@@ -17,6 +17,13 @@
     </div>
     <button id="spin">Крутить!</button>
     <div id="result"></div>
+
+    <div class="prize-list-container">
+      <h2>Что можно выиграть?</h2>
+      <ul id="prize-list">
+        <!-- Список призов будет сгенерирован здесь -->
+      </ul>
+    </div>
   </div>
   <div id="tab-content-gifts" class="tab-content" style="display:none">
     <h1 style="color:#e91e63;"><span>🎁</span> Мои подарки</h1>
@@ -56,6 +63,24 @@
         tabContents[btn.dataset.tab].style.display = '';
       });
     });
+
+    // Генерация списка призов под рулеткой
+    function generatePrizeList() {
+      const prizeList = document.getElementById('prize-list');
+      // Фильтруем "Пусто"
+      const displayPrizes = prizes.filter(p => p.starPrice > 0);
+      
+      prizeList.innerHTML = displayPrizes.map(prize => `
+        <li>
+          <img src="${prize.img}" alt="${prize.name}">
+          <span class="prize-list-name">${prize.name}</span>
+          <span class="prize-list-price">${prize.starPrice}⭐</span>
+        </li>
+      `).join('');
+    }
+
+    // Вызываем генерацию списка при загрузке
+    document.addEventListener('DOMContentLoaded', generatePrizeList);
 
     // Пример подарка для отображения (замени на динамические данные при необходимости)
     function renderGiftCard(gift) {
