@@ -247,17 +247,16 @@ def handle_spin():
 
         if user_info["attempts"] >= MAX_ATTEMPTS:
             return jsonify({"error": "No attempts left"}), 403
-
+        
         user_info["attempts"] += 1
 
-        # Логика определения приза (копируем из prizes.js, чтобы не было рассинхрона)
-        prizes = [
-            {"name": "Nail Bracelet", "starPrice": 100000, "img": "images/nail_bracelet.png"},
-            {"name": "Bonded Ring", "starPrice": 37500, "img": "images/bonded_ring.png"},
-            {"name": "Neko Helmet", "starPrice": 14000, "img": "images/neko_helmet.png"},
-            {"name": "Пусто", "starPrice": 0, "img": ""}
-        ]
-        won_prize = random.choice(prizes)
+        # Выбираем случайный приз (с учетом весов, если они есть)
+        prizes_from_js = load_prizes_from_js()
+        if not prizes_from_js:
+            logging.error("Could not load prizes from prizes.js")
+            return jsonify({"error": "Internal server error"}), 500
+
+        won_prize = random.choice(prizes_from_js)
 
         if won_prize["starPrice"] > 0:
             gift_data = {
@@ -268,9 +267,12 @@ def handle_spin():
 
         write_user_data(all_data)
         
-        return jsonify({"won_prize": won_prize})
+        return jsonify({
+            "won_prize": won_prize,
+            "attempts_left": MAX_ATTEMPTS - user_info["attempts"]
+        })
     except Exception as e:
-        logging.error(f"Error handling spin for user {data.get('user_id') if data else 'unknown'}: {e}")
+        logging.error(f"Error handling spin for {user_id}: {e}")
         return jsonify({"error": "Internal server error"}), 500
 
 @flask_app.route('/prizes')
