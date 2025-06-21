@@ -143,16 +143,15 @@ button, .tab-btn {
   right: 0;
   z-index: 100;
   padding-bottom: env(safe-area-inset-bottom);
+  background: #fff;
+  box-shadow: 0 -2px 16px #e91e6322;
+  border-top: 2px solid #f8bbd0;
 }
 
 .bottom-tabs {
-  /* position, bottom, left, right, z-index, padding-bottom - теперь на .tabs-container */
-  background: #fff;
   display: flex;
   justify-content: space-around;
-  border-top: 2px solid #f8bbd0;
   height: 60px;
-  box-shadow: 0 -2px 16px #e91e6322;
 }
 
 .tab-btn {
