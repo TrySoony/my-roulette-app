@@ -88,7 +88,7 @@ function spinRoulette() {
   // Даем браузеру применить сброс (через requestAnimationFrame)
   requestAnimationFrame(() => {
     // Теперь задаём анимацию вправо
-    roulette.style.transition = 'transform 2s cubic-bezier(0.15, 0.85, 0.35, 1)';
+    roulette.style.transition = 'transform 5s cubic-bezier(0.15, 0.85, 0.35, 1)';
     roulette.style.transform = `translateX(-${offset}px)`;
   });
 
@@ -141,7 +141,7 @@ function spinRoulette() {
     } else {
       spinBtn.textContent = 'Крутить!';
     }
-  }, 2000);
+  }, 5000);
 }
 
 // Сохраняем выигранный приз
