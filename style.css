@@ -148,6 +148,7 @@ button, .tab-btn {
   z-index: 100;
   height: 60px;
   box-shadow: 0 -2px 16px #e91e6322;
+  padding-bottom: env(safe-area-inset-bottom, 20px);
 }
 .tab-btn {
   flex: 1;
@@ -179,7 +180,7 @@ button, .tab-btn {
   margin-bottom: 2px;
 }
 .tab-content {
-  padding-bottom: 80px; /* чтобы контент не перекрывался табами */
+  padding-bottom: calc(80px + env(safe-area-inset-bottom, 20px));
   max-width: 500px;
   margin: 0 auto;
 }
@@ -307,7 +308,7 @@ ul#my-gifts-list {
     font-size: 20px;
   }
   .tab-content {
-    padding-bottom: 65px;
+    padding-bottom: calc(65px + env(safe-area-inset-bottom, 20px));
   }
   .gift-card {
     padding: 16px 12px 12px 12px;
