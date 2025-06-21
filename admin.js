@@ -143,11 +143,19 @@ document.addEventListener('DOMContentLoaded', () => {
             showError("Действие невозможно: ID администратора не найден.");
             return;
         }
+        
+        // Дополнительная проверка, что adminId - это число
+        const adminIdNum = parseInt(adminId, 10);
+        if (isNaN(adminIdNum) || adminIdNum <= 0) {
+            showError(`Действие невозможно: некорректный ID администратора (${adminId}).`);
+            return;
+        }
+
         try {
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...body, admin_id: adminId })
+                body: JSON.stringify({ ...body, admin_id: adminIdNum })
             });
             if (!response.ok) {
                  const error = await response.json();
@@ -157,6 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error(`Ошибка при вызове ${endpoint}:`, error);
             showError(error.message);
+            return null; // Возвращаем null при ошибке
         }
     }
 

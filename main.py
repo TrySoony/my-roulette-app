@@ -988,8 +988,9 @@ def remove_user_gift():
 # FastAPI будет обрабатывать /webhook, а всё остальное передавать в Flask
 app.mount("/", WSGIMiddleware(flask_app))
 
-# Этот блок нужен для Render, чтобы gunicorn мог запустить приложение
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    print("Bot is running locally...")
-    dp.run_polling(bot)
+if __name__ == '__main__':
+    import uvicorn
+    # Запуск через uvicorn, если файл запущен напрямую
+    # Для Render.com используется gunicorn, он найдет 'app' автоматически
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
