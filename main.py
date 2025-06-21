@@ -20,6 +20,9 @@ from datetime import datetime
 from fastapi import FastAPI, Request as FastAPIRequest
 from fastapi.middleware.wsgi import WSGIMiddleware
 
+# --- Включаем логирование ---
+logging.basicConfig(level=logging.INFO)
+
 # --- Получение конфигурации из переменных окружения ---
 TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID_STR = os.getenv("ADMIN_ID")
@@ -644,18 +647,36 @@ def admin_page():
 
 @dp.message(Command("admin"))
 async def admin_command(message: types.Message):
-    # Добавляем проверку, что message.from_user не None
-    if message.from_user and message.from_user.id == ADMIN_ID:
-        # URL обновлен для ngrok
-        admin_url = "https://3956-62-216-60-70.ngrok-free.app/admin" 
-        keyboard = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [InlineKeyboardButton(text="🔑 Открыть админ-панель", web_app=WebAppInfo(url=admin_url))]
-            ]
-        )
-        await message.answer("Добро пожаловать в панель администратора.", reply_markup=keyboard)
-    else:
-        await message.answer("У вас нет прав для доступа к этой команде.")
+    logging.info(f"Admin command received from user {message.from_user.id if message.from_user else 'Unknown'}")
+    try:
+        if not message.from_user:
+            logging.warning("Cannot process /admin command without user info")
+            return
+
+        logging.info(f"Comparing user ID {message.from_user.id} with ADMIN_ID {ADMIN_ID}")
+        if message.from_user.id != ADMIN_ID:
+            logging.info(f"User {message.from_user.id} is not admin. Sending 'no rights' message.")
+            return await message.answer("У вас нет прав для доступа к этой команде.")
+
+        logging.info(f"User {message.from_user.id} is admin. Preparing admin panel link.")
+        
+        if not WEBHOOK_URL:
+            logging.error("WEBHOOK_URL is not set! Cannot create admin panel link.")
+            return await message.answer("Ошибка конфигурации сервера: не удалось создать ссылку.")
+
+        admin_url = f"{WEBHOOK_URL}/admin.html"
+        logging.info(f"Admin panel URL created: {admin_url}")
+
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🔑 Открыть админ-панель", url=admin_url)]])
+        logging.info("Keyboard created. Sending message...")
+        
+        await message.answer("Админ-панель доступна по кнопке ниже:", reply_markup=keyboard)
+        logging.info("Admin panel message sent successfully.")
+
+    except Exception as e:
+        logging.exception("An error occurred in the admin_command handler!")
+        await message.answer("Произошла внутренняя ошибка. Проверьте логи сервера.")
+
 
 # --- "Склеиваем" два приложения ---
 # FastAPI будет обрабатывать /webhook, а всё остальное передавать в Flask
