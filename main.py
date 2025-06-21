@@ -4,6 +4,7 @@ from aiogram.filters import Command
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, InputMediaPhoto, BufferedInputFile, BusinessConnection, WebAppInfo, KeyboardButton, ReplyKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.exceptions import TelegramBadRequest
+from aiogram.client.default import DefaultBotProperties
 import asyncio
 import logging
 import json
@@ -33,10 +34,10 @@ try:
 except ValueError:
     raise ValueError("Переменная окружения ADMIN_ID должна быть числом")
 
-bot = Bot(TOKEN, parse_mode=ParseMode.HTML) # Указываем parse_mode здесь
+bot = Bot(TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder=None) # Отключаем стандартную обработку static
 
 # --- Новый эндпоинт для Webhook ---
 @app.route('/webhook', methods=['POST'])
