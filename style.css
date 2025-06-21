@@ -136,20 +136,25 @@ button, .tab-btn {
 }
 
 /* --- Стили для нижних вкладок --- */
-.bottom-tabs {
+.tabs-container {
   position: fixed;
+  bottom: 0;
   left: 0;
   right: 0;
-  bottom: 0;
+  z-index: 100;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.bottom-tabs {
+  /* position, bottom, left, right, z-index, padding-bottom - теперь на .tabs-container */
   background: #fff;
   display: flex;
   justify-content: space-around;
   border-top: 2px solid #f8bbd0;
-  z-index: 100;
   height: 60px;
   box-shadow: 0 -2px 16px #e91e6322;
-  padding-bottom: env(safe-area-inset-bottom, 20px);
 }
+
 .tab-btn {
   flex: 1;
   background: none;
@@ -180,7 +185,8 @@ button, .tab-btn {
   margin-bottom: 2px;
 }
 .tab-content {
-  padding-bottom: calc(80px + env(safe-area-inset-bottom, 20px));
+  /* Увеличиваем отступ, чтобы учесть высоту табов и безопасную зону */
+  padding-bottom: calc(60px + env(safe-area-inset-bottom, 20px)); /* Оставляем запас */
   max-width: 500px;
   margin: 0 auto;
 }
@@ -308,7 +314,8 @@ ul#my-gifts-list {
     font-size: 20px;
   }
   .tab-content {
-    padding-bottom: calc(65px + env(safe-area-inset-bottom, 20px));
+    /* Также увеличиваем отступ для мобильной версии */
+    padding-bottom: calc(55px + env(safe-area-inset-bottom, 20px)); /* Оставляем запас */
   }
   .gift-card {
     padding: 16px 12px 12px 12px;
