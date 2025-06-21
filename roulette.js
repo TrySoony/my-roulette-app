@@ -16,6 +16,7 @@ function showError(message) {
 function getTelegramUser() {
     if (window.Telegram && window.Telegram.WebApp) {
         const tg = window.Telegram.WebApp;
+        tg.ready(); // Сообщаем Telegram, что приложение готово
         // Расширяем область видимости кнопки "назад"
         if (tg.BackButton.isVisible) {
             tg.BackButton.hide();
@@ -30,9 +31,6 @@ function getTelegramUser() {
 
 // Инициализация приложения
 document.addEventListener('DOMContentLoaded', () => {
-  // Отладочное сообщение для проверки URL
-  alert(`Current URL: ${window.location.href}`);
-
   telegramUser = getTelegramUser();
   
   if (!telegramUser) {

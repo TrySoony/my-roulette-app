@@ -1,7 +1,4 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Отладочное сообщение для проверки URL
-    alert(`Current URL: ${window.location.href}`);
-    
     const userList = document.getElementById('user-list');
     const spinner = document.querySelector('.spinner-container');
     const modal = document.getElementById('add-prize-modal');
