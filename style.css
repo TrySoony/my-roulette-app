@@ -276,31 +276,45 @@ ul#my-gifts-list {
   }
   to {
     opacity: 1;
+  }
+}
+
 @media (max-width: 500px) {
+  h1 {
+    font-size: 1.8rem;
+  }
   .roulette-container {
     width: 98vw;
-    height: 90px;
+    height: 110px;
   }
   .prize {
-    width: 80px;
-    height: 70px;
-    font-size: 15px;
+    width: 100px;
+    height: 90px;
+    font-size: 13px;
+  }
+  .prize-img {
+    width: 45px;
+    height: 45px;
   }
   .bottom-tabs {
-    height: 50px;
+    height: 55px;
   }
   .tab-btn {
-    font-size: 15px;
+    font-size: 14px;
+    gap: 1px;
+  }
+  .tab-btn .tab-icon {
+    font-size: 20px;
   }
   .tab-content {
-    padding-bottom: 60px;
-  }
-  .gift-card img {
-    width: 80px;
-    height: 80px;
+    padding-bottom: 65px;
   }
   .gift-card {
-    padding: 16px 6px 12px 6px;
-    max-width: 98vw;
+    padding: 16px 12px 12px 12px;
+    max-width: 95vw;
+  }
+  .gift-card img {
+    width: 100px;
+    height: 100px;
   }
 }
