@@ -13,12 +13,9 @@ function showError(message) {
 }
 
 function initializeApp() {
-    alert('V1.2: Initializing App...');
     try {
         const tg = window.Telegram.WebApp;
         tg.ready();
-
-        alert(`V1.2: tg.initDataUnsafe: ${JSON.stringify(tg.initDataUnsafe, null, 2)}`);
 
         if (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
             telegramUser = tg.initDataUnsafe.user;

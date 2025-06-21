@@ -392,7 +392,23 @@ async def admin_resetwebhook_command(message: Message):
 # --- Новые, четкие обработчики для обычных пользователей ---
 @dp.message(Command("start"), F.from_user.id != config.admin_id)
 async def user_start_command(message: Message):
-    await process_start_command(message)
+    """Обработчик команды /start для обычных пользователей"""
+    # Используем URL из конфигурации
+    app_url = config.webhook_url
+    if not app_url:
+        await message.answer("Извините, веб-приложение временно недоступно.")
+        logging.error("app_url (from config.webhook_url) is not set!")
+        return
+        
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="🎁 Открыть рулетку", web_app=WebAppInfo(url=app_url))]
+        ]
+    )
+    await message.answer(
+        "Добро пожаловать в рулетку подарков! Нажмите кнопку ниже, чтобы начать.",
+        reply_markup=keyboard
+    )
 
 # Обработчик для любого текста от пользователя (НЕ админа), который НЕ является командой
 @dp.message(F.text, F.from_user.id != config.admin_id)
