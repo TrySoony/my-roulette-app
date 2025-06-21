@@ -8,34 +8,31 @@ document.addEventListener('DOMContentLoaded', () => {
     
     let adminId = null;
 
-    // Инициализация
-    if (window.Telegram && window.Telegram.WebApp) {
-        const tg = window.Telegram.WebApp;
-        tg.ready();
-        tg.expand();
-        if (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
-            adminId = tg.initDataUnsafe.user.id;
-        } else {
-            // Формируем детальное сообщение об ошибке
-            let errorDetails = [];
-            if (!window.Telegram) {
-                errorDetails.push("window.Telegram is missing.");
-            } else if (!window.Telegram.WebApp) {
-                errorDetails.push("window.Telegram.WebApp is missing.");
+    function initializeApp() {
+        alert('V1.2: Initializing Admin App...');
+        try {
+            const tg = window.Telegram.WebApp;
+            tg.ready();
+            tg.expand();
+
+            alert(`V1.2: tg.initDataUnsafe: ${JSON.stringify(tg.initDataUnsafe, null, 2)}`);
+
+            if (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
+                adminId = tg.initDataUnsafe.user.id;
+                fetchData();
             } else {
-                errorDetails.push(`tg.initData: ${tg.initData}`);
-                errorDetails.push(`tg.initDataUnsafe: ${JSON.stringify(tg.initDataUnsafe, null, 2)}`);
+                let errorDetails = [`tg.initData: ${tg.initData}`, `tg.initDataUnsafe: ${JSON.stringify(tg.initDataUnsafe, null, 2)}`];
+                const friendlyMessage = "Это приложение должно запускаться из Telegram.\nПожалуйста, не открывайте ссылку напрямую в браузере. Вернитесь в бот и нажмите кнопку 'Открыть админ-панель'.";
+                showError("Ошибка: Не удалось получить ID администратора.\n\n" + friendlyMessage + "\n\n--- Техническая информация ---\n" + errorDetails.join('\n'));
+                spinner.style.display = 'none';
             }
-            const friendlyMessage = "Это приложение должно запускаться из Telegram.\nПожалуйста, не открывайте ссылку напрямую в браузере. Вернитесь в бот и нажмите кнопку 'Открыть админ-панель'.";
-            showError("Ошибка: Не удалось получить ID администратора.\n\n" + friendlyMessage + "\n\n--- Техническая информация ---\n" + errorDetails.join('\n'));
-            spinner.style.display = 'none'; // Скрываем спиннер, если ошибка
-            return; // Прерываем выполнение, если нет ID
+        } catch(e) {
+            showError(`V1.2 Critical initialization error: ${e.message}. The app must be run from Telegram.`);
+            spinner.style.display = 'none';
         }
-    } else {
-        showError("Не удалось получить ID администратора. (Telegram.WebApp API not found)");
-        spinner.style.display = 'none'; // Скрываем спиннер, если ошибка
-        return; // Прерываем выполнение
     }
+
+    initializeApp();
     
     async function fetchData() {
         spinner.style.display = 'flex';
@@ -221,6 +218,4 @@ document.addEventListener('DOMContentLoaded', () => {
         // Можно заменить на красивую нотификацию
         alert(`Успех: ${message}`);
     }
-
-    fetchData();
 }); 

@@ -12,56 +12,37 @@ function showError(message) {
     alert(message);
 }
 
-// Более надежный способ получения данных пользователя
-function getTelegramUser() {
-    if (window.Telegram && window.Telegram.WebApp) {
+function initializeApp() {
+    alert('V1.2: Initializing App...');
+    try {
         const tg = window.Telegram.WebApp;
-        tg.ready(); // Сообщаем Telegram, что приложение готово
-        // Расширяем область видимости кнопки "назад"
-        if (tg.BackButton.isVisible) {
-            tg.BackButton.hide();
+        tg.ready();
+
+        alert(`V1.2: tg.initDataUnsafe: ${JSON.stringify(tg.initDataUnsafe, null, 2)}`);
+
+        if (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
+            telegramUser = tg.initDataUnsafe.user;
+            
+            tg.expand();
+            if (tg.BackButton.isVisible) {
+                tg.BackButton.hide();
+            }
+
+            announceUser(telegramUser.id).then(() => {
+                fetchUserStatus(telegramUser.id);
+            });
+
+        } else {
+            let errorDetails = [`tg.initData: ${tg.initData}`, `tg.initDataUnsafe: ${JSON.stringify(tg.initDataUnsafe, null, 2)}`];
+            const friendlyMessage = "Это приложение должно запускаться из Telegram.\nПожалуйста, не открывайте ссылку напрямую в браузере. Вернитесь в бот и нажмите кнопку 'Открыть рулетку'.";
+            showError("Ошибка: не удалось получить данные пользователя.\n\n" + friendlyMessage + "\n\n--- Техническая информация ---\n" + errorDetails.join('\n'));
+            spinBtn.disabled = true;
         }
-        tg.expand();
-        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-            return tg.initDataUnsafe.user;
-        }
+    } catch (e) {
+        showError(`V1.2 Critical initialization error: ${e.message}. The app must be run from Telegram.`);
+        spinBtn.disabled = true;
     }
-    return null;
 }
-
-// Инициализация приложения
-document.addEventListener('DOMContentLoaded', () => {
-  // Отладочное сообщение для проверки URL
-  alert(`Current URL: ${window.location.href}`);
-
-  telegramUser = getTelegramUser();
-  
-  if (!telegramUser) {
-    let errorDetails = [];
-    if (window.Telegram && window.Telegram.WebApp) {
-        const tg = window.Telegram.WebApp;
-        errorDetails.push(`tg.initData: ${tg.initData}`);
-        errorDetails.push(`tg.initDataUnsafe: ${JSON.stringify(tg.initDataUnsafe, null, 2)}`);
-    } else {
-        errorDetails.push("Telegram.WebApp API not found");
-    }
-    const friendlyMessage = "Это приложение должно запускаться из Telegram.\nПожалуйста, не открывайте ссылку напрямую в браузере. Вернитесь в бот и нажмите кнопку 'Открыть рулетку'.";
-    showError("Ошибка: не удалось получить данные пользователя.\n\n" + friendlyMessage + "\n\n--- Техническая информация ---\n" + errorDetails.join('\n'));
-    spinBtn.disabled = true;
-    return;
-  }
-
-  if (telegramUser && telegramUser.id) {
-    // Сначала "анонсируем" пользователя серверу, чтобы он создал запись, если ее нет.
-    // И только потом запрашиваем его статус.
-    announceUser(telegramUser.id).then(() => {
-      fetchUserStatus(telegramUser.id);
-    });
-  } else {
-    // Пользователь не авторизован в Telegram, можно показать ошибку
-    document.body.innerHTML = '<h1>Ошибка: не удалось получить данные пользователя. Откройте приложение через Telegram.</h1>';
-  }
-});
 
 // Новая функция для создания/анонсирования пользователя на сервере
 async function announceUser(userId) {
@@ -304,3 +285,5 @@ async function spinRoulette() {
 
 // При загрузке страницы обновляем состояние кнопки
 updateSpinBtnState();
+
+initializeApp();
