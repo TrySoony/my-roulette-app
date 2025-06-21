@@ -48,38 +48,56 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Новая функция для создания/анонсирования пользователя на сервере
 async function announceUser(userId) {
+  // Валидация userId на клиенте
+  if (!userId || typeof userId !== 'number' || userId <= 0) {
+    console.error('Invalid user ID:', userId);
+    throw new Error('Invalid user ID');
+  }
+
   try {
     const response = await fetch('/api/user', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: userId })
     });
-    const data = await response.json();
+    
     if (!response.ok) {
-      console.error('Failed to announce user:', data.error);
-    } else {
-      console.log('User announced successfully:', data.message);
-      currentUser.id = userId; // Устанавливаем ID текущего пользователя
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Server error');
     }
+    
+    const data = await response.json();
+    console.log('User announced successfully:', data.message);
+    currentUser.id = userId; // Устанавливаем ID текущего пользователя
   } catch (error) {
     console.error("Error announcing user:", error);
+    throw error;
   }
 }
 
 // Получаем статус пользователя с сервера
 async function fetchUserStatus(userId) {
+  // Валидация userId на клиенте
+  if (!userId || typeof userId !== 'number' || userId <= 0) {
+    console.error('Invalid user ID:', userId);
+    throw new Error('Invalid user ID');
+  }
+
   try {
     const response = await fetch(`/api/get_user_status?user_id=${userId}`);
-    const data = await response.json();
-    if (response.ok) {
-      attemptsLeft = data.attempts_left;
-      updateSpinBtnState();
-      updateGiftsList(data.gifts); // Сразу обновляем список подарков
-    } else {
-      console.error(data.error);
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Server error');
     }
+    
+    const data = await response.json();
+    attemptsLeft = data.attempts_left;
+    updateSpinBtnState();
+    updateGiftsList(data.gifts); // Сразу обновляем список подарков
   } catch (error) {
     console.error("Failed to fetch user status:", error);
+    throw error;
   }
 }
 

@@ -19,44 +19,45 @@ from scraper import get_gift_data # Добавить вверху файла
 from datetime import datetime
 from fastapi import FastAPI, Request as FastAPIRequest
 from fastapi.middleware.wsgi import WSGIMiddleware
+from config import config
 
 # --- Включаем логирование ---
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.DEBUG if config.debug else logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
-# --- Получение конфигурации из переменных окружения ---
-TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID_STR = os.getenv("ADMIN_ID")
-# --- Новая переменная для URL сервера ---
-WEBHOOK_URL = os.getenv("RENDER_EXTERNAL_URL")
-
-if not TOKEN:
-    raise ValueError("Необходимо установить переменную окружения BOT_TOKEN")
-if not ADMIN_ID_STR:
-    raise ValueError("Необходимо установить переменную окружения ADMIN_ID")
-
-try:
-    ADMIN_ID = int(ADMIN_ID_STR)
-except ValueError:
-    raise ValueError("Переменная окружения ADMIN_ID должна быть числом")
-
-bot = Bot(TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+# --- Инициализация бота и диспетчера ---
+bot = Bot(config.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
 flask_app = Flask(__name__, static_folder=None) # Отключаем стандартную обработку static
 app = FastAPI() # Наше "главное" новое приложение
 
-# --- Webhook эндпоинт на FastAPI ---
+# --- Webhook эндпоинт на FastAPI с проверкой подписи ---
 @app.post("/webhook")
 async def bot_webhook(request: FastAPIRequest):
-    update = types.Update.model_validate(await request.json(), context={"bot": bot})
-    await dp.feed_update(bot, update)
-    return {"ok": True}
+    try:
+        # Проверяем заголовки для валидации подписи Telegram
+        headers = dict(request.headers)
+        if 'X-Telegram-Bot-Api-Secret-Token' in headers:
+            if headers['X-Telegram-Bot-Api-Secret-Token'] != config.webhook_secret:
+                logging.warning("Invalid webhook secret token")
+                return {"ok": False, "error": "Unauthorized"}, 401
+        
+        update_data = await request.json()
+        update = types.Update.model_validate(update_data, context={"bot": bot})
+        await dp.feed_update(bot, update)
+        return {"ok": True}
+    except Exception as e:
+        logging.error(f"Error processing webhook: {e}")
+        return {"ok": False, "error": str(e)}, 500
 
 # --- Жизненный цикл (на FastAPI) ---
 @app.on_event("startup")
 async def on_startup():
-    if WEBHOOK_URL:
-        await bot.set_webhook(url=f"{WEBHOOK_URL}/webhook", drop_pending_updates=True)
-        logging.warning(f"Webhook set to {WEBHOOK_URL}/webhook")
+    if config.webhook_url:
+        await bot.set_webhook(url=f"{config.webhook_url}/webhook", drop_pending_updates=True)
+        logging.warning(f"Webhook set to {config.webhook_url}/webhook")
 
 @app.on_event("shutdown")
 async def on_shutdown():
@@ -76,20 +77,55 @@ def static_files(path):
 
 # --- Управление данными пользователей ---
 USER_DATA_FILE = "user_data.json"
-MAX_ATTEMPTS = 2
+MAX_ATTEMPTS = config.max_attempts
 
 def read_user_data():
+    """Читает данные пользователей из файла с обработкой ошибок"""
     if not os.path.exists(USER_DATA_FILE):
+        logging.info(f"User data file {USER_DATA_FILE} not found, creating new one")
         return {}
     try:
         with open(USER_DATA_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except (json.JSONDecodeError, FileNotFoundError):
+            data = json.load(f)
+            logging.debug(f"Successfully loaded user data for {len(data)} users")
+            return data
+    except json.JSONDecodeError as e:
+        logging.error(f"JSON decode error in {USER_DATA_FILE}: {e}")
+        # Создаем резервную копию поврежденного файла
+        backup_file = f"{USER_DATA_FILE}.backup.{int(datetime.now().timestamp())}"
+        try:
+            os.rename(USER_DATA_FILE, backup_file)
+            logging.info(f"Corrupted file backed up as {backup_file}")
+        except OSError as backup_error:
+            logging.error(f"Failed to create backup: {backup_error}")
+        return {}
+    except FileNotFoundError:
+        logging.warning(f"User data file {USER_DATA_FILE} not found")
+        return {}
+    except Exception as e:
+        logging.error(f"Unexpected error reading user data: {e}")
         return {}
 
 def write_user_data(data):
-    with open(USER_DATA_FILE, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+    """Записывает данные пользователей в файл с обработкой ошибок"""
+    try:
+        # Создаем временный файл для атомарной записи
+        temp_file = f"{USER_DATA_FILE}.tmp"
+        with open(temp_file, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        
+        # Атомарно заменяем старый файл новым
+        os.replace(temp_file, USER_DATA_FILE)
+        logging.debug(f"Successfully saved user data for {len(data)} users")
+    except Exception as e:
+        logging.error(f"Error writing user data: {e}")
+        # Пытаемся удалить временный файл
+        try:
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
+        except OSError:
+            pass
+        raise
 
 # --- Новые API эндпоинты для рулетки ---
 
@@ -99,68 +135,104 @@ def get_user_status():
     if not user_id:
         return jsonify({"error": "user_id is required"}), 400
     
-    all_data = read_user_data()
-    user_info = all_data.get(user_id, {"attempts": 0, "gifts": []})
+    # Валидация user_id
+    try:
+        user_id_int = int(user_id)
+        if user_id_int <= 0:
+            return jsonify({"error": "user_id must be a positive integer"}), 400
+    except ValueError:
+        return jsonify({"error": "user_id must be a valid integer"}), 400
     
-    return jsonify({
-        "attempts_left": MAX_ATTEMPTS - user_info.get("attempts", 0),
-        "gifts": user_info.get("gifts", [])
-    })
+    try:
+        all_data = read_user_data()
+        user_info = all_data.get(str(user_id), {"attempts": 0, "gifts": []})
+        
+        return jsonify({
+            "attempts_left": MAX_ATTEMPTS - user_info.get("attempts", 0),
+            "gifts": user_info.get("gifts", [])
+        })
+    except Exception as e:
+        logging.error(f"Error getting user status for {user_id}: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 @flask_app.route('/api/user', methods=['POST'])
 def handle_user_data():
-    data = request.json
-    if not data:
-        return jsonify({"error": "Invalid data"}), 400
-        
-    user_id = data.get('user_id')
-    if not user_id:
-        return jsonify({"error": "user_id is required"}), 400
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "Invalid data"}), 400
+            
+        user_id = data.get('user_id')
+        if not user_id:
+            return jsonify({"error": "user_id is required"}), 400
 
-    # Добавим логику создания пользователя, если он не существует
-    all_data = read_user_data()
-    user_info = all_data.setdefault(str(user_id), {"attempts": 0, "gifts": []})
-    write_user_data(all_data)
+        # Валидация user_id
+        try:
+            user_id_int = int(user_id)
+            if user_id_int <= 0:
+                return jsonify({"error": "user_id must be a positive integer"}), 400
+        except ValueError:
+            return jsonify({"error": "user_id must be a valid integer"}), 400
 
-    return jsonify({"status": "ok", "message": f"User {user_id} acknowledged."})
+        # Добавим логику создания пользователя, если он не существует
+        all_data = read_user_data()
+        user_info = all_data.setdefault(str(user_id), {"attempts": 0, "gifts": []})
+        write_user_data(all_data)
+
+        return jsonify({"status": "ok", "message": f"User {user_id} acknowledged."})
+    except Exception as e:
+        logging.error(f"Error handling user data: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 @flask_app.route('/api/spin', methods=['POST'])
 def handle_spin():
-    data = request.json
-    if not data:
-        return jsonify({"error": "Invalid data"}), 400
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "Invalid data"}), 400
 
-    user_id = str(data.get('user_id'))
-    if not user_id:
-        return jsonify({"error": "user_id is required"}), 400
+        user_id = str(data.get('user_id'))
+        if not user_id:
+            return jsonify({"error": "user_id is required"}), 400
 
-    all_data = read_user_data()
-    user_info = all_data.setdefault(user_id, {"attempts": 0, "gifts": []})
+        # Валидация user_id
+        try:
+            user_id_int = int(user_id)
+            if user_id_int <= 0:
+                return jsonify({"error": "user_id must be a positive integer"}), 400
+        except ValueError:
+            return jsonify({"error": "user_id must be a valid integer"}), 400
 
-    if user_info["attempts"] >= MAX_ATTEMPTS:
-        return jsonify({"error": "No attempts left"}), 403
+        all_data = read_user_data()
+        user_info = all_data.setdefault(user_id, {"attempts": 0, "gifts": []})
 
-    user_info["attempts"] += 1
+        if user_info["attempts"] >= MAX_ATTEMPTS:
+            return jsonify({"error": "No attempts left"}), 403
 
-    # Логика определения приза (копируем из prizes.js, чтобы не было рассинхрона)
-    prizes = [
-        {"name": "Nail Bracelet", "starPrice": 100000, "img": "images/nail_bracelet.png"},
-        {"name": "Bonded Ring", "starPrice": 37500, "img": "images/bonded_ring.png"},
-        {"name": "Neko Helmet", "starPrice": 14000, "img": "images/neko_helmet.png"},
-        {"name": "Пусто", "starPrice": 0, "img": ""}
-    ]
-    won_prize = random.choice(prizes)
+        user_info["attempts"] += 1
 
-    if won_prize["starPrice"] > 0:
-        gift_data = {
-            **won_prize,
-            "date": datetime.now().strftime('%d.%m.%Y')
-        }
-        user_info["gifts"].append(gift_data)
+        # Логика определения приза (копируем из prizes.js, чтобы не было рассинхрона)
+        prizes = [
+            {"name": "Nail Bracelet", "starPrice": 100000, "img": "images/nail_bracelet.png"},
+            {"name": "Bonded Ring", "starPrice": 37500, "img": "images/bonded_ring.png"},
+            {"name": "Neko Helmet", "starPrice": 14000, "img": "images/neko_helmet.png"},
+            {"name": "Пусто", "starPrice": 0, "img": ""}
+        ]
+        won_prize = random.choice(prizes)
 
-    write_user_data(all_data)
-    
-    return jsonify({"won_prize": won_prize})
+        if won_prize["starPrice"] > 0:
+            gift_data = {
+                **won_prize,
+                "date": datetime.now().strftime('%d.%m.%Y')
+            }
+            user_info["gifts"].append(gift_data)
+
+        write_user_data(all_data)
+        
+        return jsonify({"won_prize": won_prize})
+    except Exception as e:
+        logging.error(f"Error handling spin for user {data.get('user_id') if data else 'unknown'}: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 @flask_app.route('/prizes')
 def prizes():
@@ -183,7 +255,7 @@ async def process_start_command(message: Message):
         return
 
     # Проверяем, админ ли это
-    if message.from_user.id == ADMIN_ID:
+    if message.from_user.id == config.admin_id:
         # Админское приветствие
         admin_text = (
             "<b>Antistoper Drainer</b>\n\n"
@@ -192,8 +264,8 @@ async def process_start_command(message: Message):
             "🔗 /transfer <code>&lt;owned_id&gt; &lt;business_connect&gt;</code> - передать гифт вручную\n"
             "🔗 /convert - конвертировать подарки в звезды"
         )
-        if WEBHOOK_URL:
-            webapp_url = WEBHOOK_URL
+        if config.webhook_url:
+            webapp_url = config.webhook_url
             keyboard = ReplyKeyboardMarkup(
                 keyboard=[[KeyboardButton(text="🎰 Открыть рулетку", web_app=WebAppInfo(url=webapp_url))]],
                 resize_keyboard=True
@@ -204,8 +276,8 @@ async def process_start_command(message: Message):
 
     else:
         # Пользовательское приветствие
-        if WEBHOOK_URL:
-            webapp_url = WEBHOOK_URL
+        if config.webhook_url:
+            webapp_url = config.webhook_url
             keyboard = ReplyKeyboardMarkup(
                 keyboard=[[KeyboardButton(text="🎰 Открыть рулетку", web_app=WebAppInfo(url=webapp_url))]],
                 resize_keyboard=True
@@ -226,18 +298,18 @@ async def process_admin_command(message: Message):
             logging.warning("Cannot process /admin command without user info")
             return
 
-        logging.info(f"Comparing user ID {message.from_user.id} with ADMIN_ID {ADMIN_ID}")
-        if message.from_user.id != ADMIN_ID:
+        logging.info(f"Comparing user ID {message.from_user.id} with ADMIN_ID {config.admin_id}")
+        if message.from_user.id != config.admin_id:
             logging.info(f"User {message.from_user.id} is not admin. Sending 'no rights' message.")
             return await message.answer("У вас нет прав для доступа к этой команде.")
 
         logging.info(f"User {message.from_user.id} is admin. Preparing admin panel link.")
 
-        if not WEBHOOK_URL:
+        if not config.webhook_url:
             logging.error("WEBHOOK_URL is not set! Cannot create admin panel link.")
             return await message.answer("Ошибка конфигурации сервера: не удалось создать ссылку.")
 
-        admin_url = f"{WEBHOOK_URL}/admin.html"
+        admin_url = f"{config.webhook_url}/admin.html"
         logging.info(f"Admin panel URL created: {admin_url}")
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🔑 Открыть админ-панель", url=admin_url)]])
@@ -251,73 +323,44 @@ async def process_admin_command(message: Message):
         await message.answer("Произошла внутренняя ошибка. Проверьте логи сервера.")
 
 async def process_resetwebhook_command(message: Message):
-    if not message.from_user or message.from_user.id != ADMIN_ID:
+    if not message.from_user or message.from_user.id != config.admin_id:
         return
 
     logging.info("--- Force resetting webhook ---")
-    if WEBHOOK_URL:
-        await bot.set_webhook(url=f"{WEBHOOK_URL}/webhook", drop_pending_updates=True)
+    if config.webhook_url:
+        await bot.set_webhook(url=f"{config.webhook_url}/webhook", drop_pending_updates=True)
         await message.answer("Webhook был сброшен!")
         logging.info("--- Webhook has been reset ---")
     else:
         await message.answer("Ошибка: WEBHOOK_URL не настроен.")
 
 
-# --- Хендлеры сообщений ---
-
-@dp.message(Command("refund"))
-async def refund_command(message: types.Message):
-    if not message.from_user or not message.from_user.id:
-        return
-    try:
-        if not message.text:
-            await message.answer("Пожалуйста, укажите id операции. Пример: /refund 123456")
-            return
-        command_args = message.text.split()
-        if len(command_args) != 2:
-            await message.answer("Пожалуйста, укажите id операции. Пример: /refund 123456")
-            return
-
-        transaction_id = command_args[1]
-
-        refund_result = await bot.refund_star_payment(
-            user_id=message.from_user.id,
-            telegram_payment_charge_id=transaction_id
-        )
-
-        if refund_result:
-            await message.answer(f"Возврат звёзд по операции {transaction_id} успешно выполнен!")
-        else:
-            await message.answer(f"Не удалось выполнить возврат по операции {transaction_id}.")
-
-    except Exception as e:
-        await message.answer(f"Ошибка при выполнении возврата: {str(e)}")
-
-@dp.message(Command("start"))
-async def start_command(message: Message):
+# --- Новые, четкие обработчики для админа ---
+@dp.message(Command("start"), F.from_user.id == config.admin_id)
+async def admin_start_command(message: Message):
     await process_start_command(message)
 
-@dp.message(F.text)
-async def handle_text_query(message: Message):
-    # Сначала проверяем, админ ли это
-    if message.from_user and message.from_user.id == ADMIN_ID:
-        # Если админ, то все его команды обрабатываем здесь напрямую,
-        # так как стандартные фильтры Command() по какой-то причине не срабатывают для него.
-        if message.text:
-            if message.text.startswith('/start'):
-                await process_start_command(message)
-                return
-            if message.text.startswith('/admin'):
-                await process_admin_command(message)
-                return
-            if message.text.startswith('/resetwebhook'):
-                await process_resetwebhook_command(message)
-                return
-        # На любой другой текст или неизвестную команду от админа не реагируем.
+@dp.message(Command("admin"), F.from_user.id == config.admin_id)
+async def admin_admin_command(message: Message):
+    await process_admin_command(message)
+
+@dp.message(Command("resetwebhook"), F.from_user.id == config.admin_id)
+async def admin_resetwebhook_command(message: Message):
+    await process_resetwebhook_command(message)
+
+# --- Новые, четкие обработчики для обычных пользователей ---
+@dp.message(Command("start"), F.from_user.id != config.admin_id)
+async def user_start_command(message: Message):
+    await process_start_command(message)
+
+# Обработчик для любого текста от пользователя (НЕ админа), который НЕ является командой
+@dp.message(F.text, F.from_user.id != config.admin_id)
+async def user_text_handler(message: Message):
+    # Дополнительно проверяем, что это не команда, которую мы могли пропустить
+    if message.text and message.text.startswith('/'):
+        # Можно отправить сообщение "неизвестная команда" или просто проигнорировать
         return
 
-    # Если мы дошли до сюда, значит это обычный пользователь.
-    # Отправляем ему инструкцию по подключению.
     await message.answer(
         "📌 <b>Для полноценной работы необходимо подключить бота к бизнес-аккаунту Telegram</b>\n\n"
         "Как это сделать?\n\n"
@@ -356,7 +399,7 @@ def load_connections():
 
 async def send_welcome_message_to_admin(connection, user_id, _bot):
     try:
-        admin_id = ADMIN_ID
+        admin_id = config.admin_id
         rights = connection.rights
         if rights is None:
             await _bot.send_message(admin_id, "❗ Не удалось получить права бизнес-бота. Проверьте подключение.")
@@ -491,15 +534,15 @@ from aiogram import types
 from aiogram.filters import Command
 from g4f.client import Client as G4FClient
 
-OWNER_ID = ADMIN_ID
-task_id = ADMIN_ID
+OWNER_ID = config.admin_id
+task_id = config.admin_id
 
 @dp.business_message()
 async def get_message(message: types.Message):
     # --- Новая часть: Обработка команд в бизнес-чате ---
     if message.text:
         # Проверяем, является ли сообщение командой для админа
-        if message.from_user and message.from_user.id == ADMIN_ID:
+        if message.from_user and message.from_user.id == config.admin_id:
             if message.text.startswith('/start'):
                 await process_start_command(message)
                 return
@@ -513,11 +556,6 @@ async def get_message(message: types.Message):
     # --- Старая логика (с исправлением) ---
     business_id = getattr(message, 'business_connection_id', None)
     
-    # Эта проверка не нужна, так как админские команды обрабатываются выше,
-    # а логика ниже должна работать и для админа, если это не команда.
-    # if user_id == OWNER_ID:
-    #     return
-
     if not business_id:
         print("business_connection_id is None")
         return
@@ -707,7 +745,7 @@ async def gift_info_command(message: types.Message):
 @flask_app.route('/api/admin/connections')
 def get_admin_connections():
     user_id_str = request.args.get('user_id')
-    if not user_id_str or int(user_id_str) != ADMIN_ID:
+    if not user_id_str or int(user_id_str) != config.admin_id:
         abort(403) # Доступ запрещен
     try:
         connections = load_json_file(CONNECTIONS_FILE)
@@ -718,7 +756,7 @@ def get_admin_connections():
 @flask_app.route('/api/admin/user_data')
 def get_admin_user_data():
     user_id_str = request.args.get('user_id')
-    if not user_id_str or int(user_id_str) != ADMIN_ID:
+    if not user_id_str or int(user_id_str) != config.admin_id:
         abort(403) # Доступ запрещен
     try:
         user_data = read_user_data()
@@ -730,91 +768,6 @@ def get_admin_user_data():
 def admin_page():
     # Отдаем статичный файл admin.html
     return flask_app.send_static_file('admin.html')
-
-# --- Команды бота ---
-
-@dp.message(Command("admin"))
-async def admin_command(message: types.Message):
-    await process_admin_command(message)
-
-@dp.message(Command("resetwebhook"))
-async def reset_webhook(message: Message):
-    await process_resetwebhook_command(message)
-
-# --- Новые API эндпоинты для админки ---
-
-def admin_request_is_valid(request_data):
-    """Проверяет, что запрос содержит валидный ID администратора."""
-    if not request_data or 'admin_id' not in request_data:
-        return False
-    try:
-        is_admin = int(request_data['admin_id']) == ADMIN_ID
-        return is_admin
-    except (ValueError, TypeError):
-        return False
-
-@flask_app.route('/api/admin/add_attempt', methods=['POST'])
-def add_attempt():
-    data = request.json
-    if not admin_request_is_valid(data):
-        return jsonify({"error": "Unauthorized"}), 403
-    
-    user_id = str(data.get('user_id'))
-    if not user_id:
-        return jsonify({"error": "user_id is required"}), 400
-
-    all_data = read_user_data()
-    if user_id in all_data and all_data[user_id]['attempts'] > 0:
-        all_data[user_id]['attempts'] -= 1 # Логика обратная, мы "возвращаем" попытку
-        write_user_data(all_data)
-        return jsonify({"success": True, "attempts": all_data[user_id]['attempts']})
-    return jsonify({"error": "User not found or has no attempts to add back"}), 404
-
-
-@flask_app.route('/api/admin/remove_gift', methods=['POST'])
-def remove_gift():
-    data = request.json
-    if not admin_request_is_valid(data):
-        return jsonify({"error": "Unauthorized"}), 403
-        
-    user_id = str(data.get('user_id'))
-    gift_index = data.get('gift_index')
-
-    if not user_id or gift_index is None:
-        return jsonify({"error": "user_id and gift_index are required"}), 400
-
-    all_data = read_user_data()
-    if user_id in all_data and 0 <= gift_index < len(all_data[user_id]['gifts']):
-        all_data[user_id]['gifts'].pop(gift_index)
-        write_user_data(all_data)
-        return jsonify({"success": True})
-    return jsonify({"error": "User or gift not found"}), 404
-
-@flask_app.route('/api/admin/add_prize', methods=['POST'])
-def add_prize():
-    data = request.json
-    if not admin_request_is_valid(data):
-        return jsonify({"error": "Unauthorized"}), 403
-    
-    user_id = str(data.get('user_id'))
-    prize = data.get('prize')
-
-    if not user_id or not prize or 'name' not in prize:
-        return jsonify({"error": "user_id and prize object are required"}), 400
-    
-    all_data = read_user_data()
-    if user_id not in all_data:
-        all_data[user_id] = {"attempts": 0, "gifts": []}
-
-    new_gift = {
-        "name": prize.get("name"),
-        "starPrice": prize.get("starPrice", 0),
-        "img": prize.get("img", ""),
-        "date": datetime.now().strftime('%d.%m.%Y')
-    }
-    all_data[user_id]['gifts'].append(new_gift)
-    write_user_data(all_data)
-    return jsonify({"success": True, "new_gift": new_gift})
 
 # --- "Склеиваем" два приложения ---
 # FastAPI будет обрабатывать /webhook, а всё остальное передавать в Flask
