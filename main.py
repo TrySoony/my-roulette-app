@@ -17,7 +17,6 @@ from aiogram.methods import GetBusinessAccountGifts
 from flask import Flask, jsonify, request, abort, send_from_directory
 from scraper import get_gift_data # Добавить вверху файла
 from datetime import datetime
-from a2wsgi import ASGIMiddleware
 from fastapi import FastAPI, Request as FastAPIRequest
 from fastapi.middleware.wsgi import WSGIMiddleware
 
