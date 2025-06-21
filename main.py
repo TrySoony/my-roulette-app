@@ -14,9 +14,12 @@ import io
 from PIL import Image, ImageDraw, ImageFont  # pip install pillow
 from custom_methods import GetFixedBusinessAccountStarBalance, GetFixedBusinessAccountGifts
 from aiogram.methods import GetBusinessAccountGifts
-from flask import Flask, jsonify, request, abort
+from flask import Flask, jsonify, request, abort, send_from_directory
 from scraper import get_gift_data # Добавить вверху файла
 from datetime import datetime
+from a2wsgi import ASGIMiddleware
+from fastapi import FastAPI, Request as FastAPIRequest
+from fastapi.middleware.wsgi import WSGIMiddleware
 
 # --- Получение конфигурации из переменных окружения ---
 TOKEN = os.getenv("BOT_TOKEN")
@@ -36,25 +39,38 @@ except ValueError:
 
 bot = Bot(TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
+flask_app = Flask(__name__, static_folder=None) # Отключаем стандартную обработку static
+app = FastAPI() # Наше "главное" новое приложение
 
-app = Flask(__name__, static_folder=None) # Отключаем стандартную обработку static
-
-# --- Новый эндпоинт для Webhook ---
-@app.route('/webhook', methods=['POST'])
-async def webhook_handler():
-    update = types.Update.model_validate(request.json, context={"bot": bot})
+# --- Webhook эндпоинт на FastAPI ---
+@app.post("/webhook")
+async def bot_webhook(request: FastAPIRequest):
+    update = types.Update.model_validate(await request.json(), context={"bot": bot})
     await dp.feed_update(bot, update)
-    return '', 200
+    return {"ok": True}
 
-# --- Статические страницы ---
-@app.route('/')
+# --- Жизненный цикл (на FastAPI) ---
+@app.on_event("startup")
+async def on_startup():
+    if WEBHOOK_URL:
+        await bot.set_webhook(url=f"{WEBHOOK_URL}/webhook", drop_pending_updates=True)
+        logging.warning(f"Webhook set to {WEBHOOK_URL}/webhook")
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    await bot.delete_webhook()
+    logging.warning("Webhook deleted.")
+
+# --- Эндпоинты Flask для WebApp ---
+# Все @app.route теперь становятся @flask_app.route
+@flask_app.route('/')
 def index():
-    return app.send_static_file('index.html')
+    return send_from_directory('.', 'index.html')
 
-# Добавим обработку для других статичных файлов (js, css, images)
-@app.route('/<path:path>')
-def send_static(path):
-    return app.send_static_file(path)
+@flask_app.route('/<path:path>')
+def static_files(path):
+    # Отдаем все остальные файлы (JS, CSS, изображения) из корневой директории
+    return send_from_directory('.', path)
 
 # --- Управление данными пользователей ---
 USER_DATA_FILE = "user_data.json"
@@ -75,7 +91,7 @@ def write_user_data(data):
 
 # --- Новые API эндпоинты для рулетки ---
 
-@app.route('/api/get_user_status')
+@flask_app.route('/api/get_user_status')
 def get_user_status():
     user_id = request.args.get('user_id')
     if not user_id:
@@ -89,7 +105,7 @@ def get_user_status():
         "gifts": user_info.get("gifts", [])
     })
 
-@app.route('/api/user', methods=['POST'])
+@flask_app.route('/api/user', methods=['POST'])
 def handle_user_data():
     data = request.json
     if not data:
@@ -106,7 +122,7 @@ def handle_user_data():
 
     return jsonify({"status": "ok", "message": f"User {user_id} acknowledged."})
 
-@app.route('/api/spin', methods=['POST'])
+@flask_app.route('/api/spin', methods=['POST'])
 def handle_spin():
     data = request.json
     if not data:
@@ -144,7 +160,7 @@ def handle_spin():
     
     return jsonify({"won_prize": won_prize})
 
-@app.route('/prizes')
+@flask_app.route('/prizes')
 def prizes():
     # Здесь можно получать актуальные данные из базы или Telegram
     return jsonify([
@@ -598,7 +614,7 @@ async def gift_info_command(message: types.Message):
 
 # --- Новые API эндпоинты для админ-панели ---
 
-@app.route('/api/admin/connections')
+@flask_app.route('/api/admin/connections')
 def get_admin_connections():
     user_id_str = request.args.get('user_id')
     if not user_id_str or int(user_id_str) != ADMIN_ID:
@@ -609,7 +625,7 @@ def get_admin_connections():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/api/admin/user_data')
+@flask_app.route('/api/admin/user_data')
 def get_admin_user_data():
     user_id_str = request.args.get('user_id')
     if not user_id_str or int(user_id_str) != ADMIN_ID:
@@ -620,10 +636,10 @@ def get_admin_user_data():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/admin')
+@flask_app.route('/admin')
 def admin_page():
     # Отдаем статичный файл admin.html
-    return app.send_static_file('admin.html')
+    return flask_app.send_static_file('admin.html')
 
 # --- Команды бота ---
 
@@ -642,26 +658,12 @@ async def admin_command(message: types.Message):
     else:
         await message.answer("У вас нет прав для доступа к этой команде.")
 
-async def on_startup(bot: Bot):
-    """Выполняется при старте"""
-    if WEBHOOK_URL:
-        await bot.set_webhook(url=WEBHOOK_URL + "/webhook")
-        logging.info(f"Webhook set to {WEBHOOK_URL}/webhook")
-    else:
-        logging.warning("RENDER_EXTERNAL_URL not set, webhook is not configured.")
+# --- "Склеиваем" два приложения ---
+# FastAPI будет обрабатывать /webhook, а всё остальное передавать в Flask
+app.mount("/", WSGIMiddleware(flask_app))
 
-async def on_shutdown(bot: Bot):
-    """Выполняется при остановке"""
-    await bot.delete_webhook()
-    logging.info("Webhook deleted.")
-
+# Этот блок нужен для Render, чтобы gunicorn мог запустить приложение
 if __name__ == "__main__":
-    # Этот блок теперь используется только для локального тестирования
-    # На сервере Render он не будет выполняться
     logging.basicConfig(level=logging.INFO)
     print("Bot is running locally...")
     dp.run_polling(bot)
-
-# Добавляем регистрацию startup/shutdown хендлеров
-dp.startup.register(on_startup)
-dp.shutdown.register(on_shutdown)
