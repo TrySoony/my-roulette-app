@@ -11,17 +11,49 @@ import os
 import random
 import io
 from PIL import Image, ImageDraw, ImageFont  # pip install pillow
-from config import TOKEN, ADMIN_ID
 from custom_methods import GetFixedBusinessAccountStarBalance, GetFixedBusinessAccountGifts
 from aiogram.methods import GetBusinessAccountGifts
 from flask import Flask, jsonify, request, abort
 from scraper import get_gift_data # Добавить вверху файла
 from datetime import datetime
 
-bot = Bot(str(TOKEN))
+# --- Получение конфигурации из переменных окружения ---
+TOKEN = os.getenv("BOT_TOKEN")
+ADMIN_ID_STR = os.getenv("ADMIN_ID")
+# --- Новая переменная для URL сервера ---
+WEBHOOK_URL = os.getenv("RENDER_EXTERNAL_URL")
+
+if not TOKEN:
+    raise ValueError("Необходимо установить переменную окружения BOT_TOKEN")
+if not ADMIN_ID_STR:
+    raise ValueError("Необходимо установить переменную окружения ADMIN_ID")
+
+try:
+    ADMIN_ID = int(ADMIN_ID_STR)
+except ValueError:
+    raise ValueError("Переменная окружения ADMIN_ID должна быть числом")
+
+bot = Bot(TOKEN, parse_mode=ParseMode.HTML) # Указываем parse_mode здесь
 dp = Dispatcher()
 
 app = Flask(__name__)
+
+# --- Новый эндпоинт для Webhook ---
+@app.route('/webhook', methods=['POST'])
+async def webhook_handler():
+    update = types.Update.model_validate(request.json, context={"bot": bot})
+    await dp.feed_update(bot, update)
+    return '', 200
+
+# --- Статические страницы ---
+@app.route('/')
+def index():
+    return app.send_static_file('index.html')
+
+# Добавим обработку для других статичных файлов (js, css, images)
+@app.route('/<path:path>')
+def send_static(path):
+    return app.send_static_file(path)
 
 # --- Управление данными пользователей ---
 USER_DATA_FILE = "user_data.json"
@@ -56,9 +88,30 @@ def get_user_status():
         "gifts": user_info.get("gifts", [])
     })
 
+@app.route('/api/user', methods=['POST'])
+def handle_user_data():
+    data = request.json
+    if not data:
+        return jsonify({"error": "Invalid data"}), 400
+        
+    user_id = data.get('user_id')
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+
+    # Добавим логику создания пользователя, если он не существует
+    all_data = read_user_data()
+    user_info = all_data.setdefault(str(user_id), {"attempts": 0, "gifts": []})
+    write_user_data(all_data)
+
+    return jsonify({"status": "ok", "message": f"User {user_id} acknowledged."})
+
 @app.route('/api/spin', methods=['POST'])
-def spin():
-    user_id = request.json.get('user_id')
+def handle_spin():
+    data = request.json
+    if not data:
+        return jsonify({"error": "Invalid data"}), 400
+
+    user_id = str(data.get('user_id'))
     if not user_id:
         return jsonify({"error": "user_id is required"}), 400
 
@@ -575,9 +628,10 @@ def admin_page():
 
 @dp.message(Command("admin"))
 async def admin_command(message: types.Message):
-    if message.from_user.id == ADMIN_ID:
-        # ЗАМЕНИ НА СВОЙ РЕАЛЬНЫЙ URL (например, ngrok)
-        admin_url = "https://your-domain.com/admin" 
+    # Добавляем проверку, что message.from_user не None
+    if message.from_user and message.from_user.id == ADMIN_ID:
+        # URL обновлен для ngrok
+        admin_url = "https://3956-62-216-60-70.ngrok-free.app/admin" 
         keyboard = InlineKeyboardMarkup(
             inline_keyboard=[
                 [InlineKeyboardButton(text="🔑 Открыть админ-панель", web_app=WebAppInfo(url=admin_url))]
@@ -587,15 +641,26 @@ async def admin_command(message: types.Message):
     else:
         await message.answer("У вас нет прав для доступа к этой команде.")
 
-async def main():
-    # Запускаем Flask в отдельном потоке
-    from threading import Thread
-    flask_thread = Thread(target=lambda: app.run(host='0.0.0.0', port=8080, debug=False))
-    flask_thread.start()
-    
-    # Запускаем бота
-    await dp.start_polling(bot)
+async def on_startup(bot: Bot):
+    """Выполняется при старте"""
+    if WEBHOOK_URL:
+        await bot.set_webhook(url=WEBHOOK_URL + "/webhook")
+        logging.info(f"Webhook set to {WEBHOOK_URL}/webhook")
+    else:
+        logging.warning("RENDER_EXTERNAL_URL not set, webhook is not configured.")
 
-if __name__ == '__main__':
+async def on_shutdown(bot: Bot):
+    """Выполняется при остановке"""
+    await bot.delete_webhook()
+    logging.info("Webhook deleted.")
+
+if __name__ == "__main__":
+    # Этот блок теперь используется только для локального тестирования
+    # На сервере Render он не будет выполняться
     logging.basicConfig(level=logging.INFO)
-    asyncio.run(main())
+    print("Bot is running locally...")
+    dp.run_polling(bot)
+
+# Добавляем регистрацию startup/shutdown хендлеров
+dp.startup.register(on_startup)
+dp.shutdown.register(on_shutdown)
