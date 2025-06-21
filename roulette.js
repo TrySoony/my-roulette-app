@@ -31,6 +31,9 @@ function getTelegramUser() {
 
 // Инициализация приложения
 document.addEventListener('DOMContentLoaded', () => {
+  // Отладочное сообщение для проверки URL
+  alert(`Current URL: ${window.location.href}`);
+
   telegramUser = getTelegramUser();
   
   if (!telegramUser) {
