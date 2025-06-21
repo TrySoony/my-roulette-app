@@ -677,6 +677,18 @@ async def admin_command(message: types.Message):
         logging.exception("An error occurred in the admin_command handler!")
         await message.answer("Произошла внутренняя ошибка. Проверьте логи сервера.")
 
+@dp.message(Command("resetwebhook"))
+async def reset_webhook(message: Message):
+    if not message.from_user or message.from_user.id != ADMIN_ID:
+        return
+
+    logging.info("--- Force resetting webhook ---")
+    if WEBHOOK_URL:
+        await bot.set_webhook(url=f"{WEBHOOK_URL}/webhook", drop_pending_updates=True)
+        await message.answer("Webhook был сброшен!")
+        logging.info("--- Webhook has been reset ---")
+    else:
+        await message.answer("Ошибка: WEBHOOK_URL не настроен.")
 
 # --- "Склеиваем" два приложения ---
 # FastAPI будет обрабатывать /webhook, а всё остальное передавать в Flask
