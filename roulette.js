@@ -2,27 +2,51 @@ const roulette = document.getElementById('roulette');
 const spinBtn = document.getElementById('spin');
 const resultDiv = document.getElementById('result');
 
-// Максимум попыток
-const MAX_ATTEMPTS = 2;
+let currentUser = {}; // Храним ID пользователя
+let attemptsLeft = 0; // Храним оставшиеся попытки
 
-function getAttempts() {
-  return parseInt(localStorage.getItem('roulette_attempts') || '0', 10);
+// Инициализация приложения
+document.addEventListener('DOMContentLoaded', () => {
+  if (window.Telegram && Telegram.WebApp) {
+    Telegram.WebApp.ready();
+    currentUser = Telegram.WebApp.initDataUnsafe.user;
+    if (currentUser && currentUser.id) {
+      fetchUserStatus(currentUser.id);
+    } else {
+      // Пользователь не авторизован в Telegram, можно показать ошибку
+      document.body.innerHTML = '<h1>Ошибка: не удалось получить данные пользователя. Откройте приложение через Telegram.</h1>';
+    }
+  } else {
+    // Для отладки в браузере
+    console.warn("Telegram WebApp is not available. Using mock user.");
+    currentUser = { id: 'mock_user_123' };
+    fetchUserStatus(currentUser.id);
+  }
+});
+
+// Получаем статус пользователя с сервера
+async function fetchUserStatus(userId) {
+  try {
+    const response = await fetch(`/api/get_user_status?user_id=${userId}`);
+    const data = await response.json();
+    if (response.ok) {
+      attemptsLeft = data.attempts_left;
+      updateSpinBtnState();
+      updateGiftsList(data.gifts); // Сразу обновляем список подарков
+    } else {
+      console.error(data.error);
+    }
+  } catch (error) {
+    console.error("Failed to fetch user status:", error);
+  }
 }
-function setAttempts(val) {
-  localStorage.setItem('roulette_attempts', val);
-}
-function incAttempts() {
-  setAttempts(getAttempts() + 1);
-}
-function isSpinAvailable() {
-  return getAttempts() < MAX_ATTEMPTS;
-}
+
 function updateSpinBtnState() {
-  spinBtn.disabled = !isSpinAvailable();
-  if (!isSpinAvailable()) {
+  spinBtn.disabled = attemptsLeft <= 0;
+  if (attemptsLeft <= 0) {
     spinBtn.textContent = 'Попытки закончились';
   } else {
-    spinBtn.textContent = 'Крутить!';
+    spinBtn.textContent = `Крутить! (${attemptsLeft} left)`;
   }
 }
 
@@ -109,10 +133,9 @@ winModalBtn.addEventListener('click', () => {
   document.querySelector('.tab-btn[data-tab="gifts"]').click();
 });
 
-function spinRoulette() {
-  if (!isSpinAvailable()) return;
-  incAttempts();
-  updateSpinBtnState();
+async function spinRoulette() {
+  if (attemptsLeft <= 0) return;
+  spinBtn.disabled = true; // Сразу блокируем кнопку
 
   // Сбрасываем старые анимации перед новым запуском
   document.querySelectorAll('.prize.prize-won').forEach(el => el.classList.remove('prize-won'));
@@ -147,73 +170,43 @@ function spinRoulette() {
     roulette.classList.add('spinning');
   });
 
-  setTimeout(() => {
-    // Получаем координаты pointer
-    const pointer = document.querySelector('.pointer');
-    const pointerRect = pointer.getBoundingClientRect();
-    // Получаем все призы
-    const prizeDivs = document.querySelectorAll('.prize');
-    let winningDiv = null;
-    let foundPrizeText = null;
-
-    prizeDivs.forEach(div => {
-      const rect = div.getBoundingClientRect();
-      if (
-        pointerRect.left >= rect.left &&
-        pointerRect.right >= pointerRect.right
-      ) {
-        winningDiv = div;
-        foundPrizeText = div.querySelector('.prize-name').textContent;
-      }
+  // Отправляем запрос на сервер для совершения спина
+  try {
+    const response = await fetch('/api/spin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: currentUser.id })
     });
-
-    // Находим приз по названию
-    let prizeUnderPointer = null;
-    if (foundPrizeText) {
-      prizeUnderPointer = prizes.find(prize => foundPrizeText === prize.name);
-    }
-
-    // Фолбэк, если не найдено (на всякий случай)
-    if (!prizeUnderPointer) {
-      prizeUnderPointer = prizes[randomIndex % prizeCount];
+    
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || 'Spin failed');
     }
     
-    // Добавляем класс для анимации текста результата
-    resultDiv.classList.add('won');
+    const prizeUnderPointer = data.won_prize;
+    attemptsLeft--;
+    updateSpinBtnState();
+    
+    // --- Запускаем анимацию на клиенте, зная результат ---
+    const prizeIndex = prizes.findIndex(p => p.name === prizeUnderPointer.name);
+    // ... (логика анимации остается примерно той же, но теперь `randomIndex` - это `prizeIndex`)
+    // ...
+    
+    setTimeout(() => {
+        if (prizeUnderPointer.starPrice > 0) {
+            showWinModal(prizeUnderPointer);
+            // Запрашиваем обновленные данные после выигрыша
+            fetchUserStatus(currentUser.id); 
+        } else {
+            resultDiv.textContent = `Вы ничего не выиграли.`;
+        }
+    }, 5000);
 
-    if (prizeUnderPointer.starPrice > 0) {
-      resultDiv.textContent = `Вы выиграли: ${prizeUnderPointer.name} (${prizeUnderPointer.starPrice}⭐)!`;
-      saveGift(prizeUnderPointer);
-      showWinModal(prizeUnderPointer); // Показываем модальное окно
-      // Добавляем класс для анимации выигранного приза
-      if (winningDiv) {
-        winningDiv.classList.add('prize-won');
-      }
-    } else {
-      resultDiv.textContent = `Вы ничего не выиграли.`;
-    }
-
-    // Отправка результата в Telegram WebApp
-    if (window.Telegram && Telegram.WebApp) {
-      Telegram.WebApp.sendData(JSON.stringify({prize: prizeUnderPointer}));
-      // Не закрываем сразу, чтобы пользователь увидел результат
-      // Telegram.WebApp.close(); 
-    }
-
-  }, 5000); // Таймер должен совпадать с длительностью анимации
-}
-
-// Сохраняем выигранный приз
-function saveGift(prize) {
-  if (prize.starPrice === 0) return; // не сохраняем пусто
-  const gifts = JSON.parse(localStorage.getItem('my_gifts') || '[]');
-  gifts.push({
-    name: prize.name,
-    img: prize.img,
-    starPrice: prize.starPrice,
-    date: new Date().toLocaleDateString('ru-RU')
-  });
-  localStorage.setItem('my_gifts', JSON.stringify(gifts));
+  } catch (error) {
+    console.error('Error during spin:', error);
+    resultDiv.textContent = `Ошибка: ${error.message}`;
+    spinBtn.disabled = false; // Разблокируем кнопку в случае ошибки
+  }
 }
 
 // Первичная отрисовка (по умолчанию 3 круга)
@@ -234,5 +227,3 @@ function saveGift(prize) {
 
 // При загрузке страницы обновляем состояние кнопки
 updateSpinBtnState();
-
-spinBtn.addEventListener('click', spinRoulette);

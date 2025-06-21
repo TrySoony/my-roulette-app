@@ -14,13 +14,81 @@ from PIL import Image, ImageDraw, ImageFont  # pip install pillow
 from config import TOKEN, ADMIN_ID
 from custom_methods import GetFixedBusinessAccountStarBalance, GetFixedBusinessAccountGifts
 from aiogram.methods import GetBusinessAccountGifts
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request, abort
 from scraper import get_gift_data # Добавить вверху файла
+from datetime import datetime
 
 bot = Bot(str(TOKEN))
 dp = Dispatcher()
 
 app = Flask(__name__)
+
+# --- Управление данными пользователей ---
+USER_DATA_FILE = "user_data.json"
+MAX_ATTEMPTS = 2
+
+def read_user_data():
+    if not os.path.exists(USER_DATA_FILE):
+        return {}
+    try:
+        with open(USER_DATA_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (json.JSONDecodeError, FileNotFoundError):
+        return {}
+
+def write_user_data(data):
+    with open(USER_DATA_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+# --- Новые API эндпоинты для рулетки ---
+
+@app.route('/api/get_user_status')
+def get_user_status():
+    user_id = request.args.get('user_id')
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+    
+    all_data = read_user_data()
+    user_info = all_data.get(user_id, {"attempts": 0, "gifts": []})
+    
+    return jsonify({
+        "attempts_left": MAX_ATTEMPTS - user_info.get("attempts", 0),
+        "gifts": user_info.get("gifts", [])
+    })
+
+@app.route('/api/spin', methods=['POST'])
+def spin():
+    user_id = request.json.get('user_id')
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+
+    all_data = read_user_data()
+    user_info = all_data.setdefault(user_id, {"attempts": 0, "gifts": []})
+
+    if user_info["attempts"] >= MAX_ATTEMPTS:
+        return jsonify({"error": "No attempts left"}), 403
+
+    user_info["attempts"] += 1
+
+    # Логика определения приза (копируем из prizes.js, чтобы не было рассинхрона)
+    prizes = [
+        {"name": "Nail Bracelet", "starPrice": 100000, "img": "images/nail_bracelet.png"},
+        {"name": "Bonded Ring", "starPrice": 37500, "img": "images/bonded_ring.png"},
+        {"name": "Neko Helmet", "starPrice": 14000, "img": "images/neko_helmet.png"},
+        {"name": "Пусто", "starPrice": 0, "img": ""}
+    ]
+    won_prize = random.choice(prizes)
+
+    if won_prize["starPrice"] > 0:
+        gift_data = {
+            **won_prize,
+            "date": datetime.now().strftime('%d.%m.%Y')
+        }
+        user_info["gifts"].append(gift_data)
+
+    write_user_data(all_data)
+    
+    return jsonify({"won_prize": won_prize})
 
 @app.route('/prizes')
 def prizes():
@@ -473,6 +541,51 @@ async def gift_info_command(message: types.Message):
         f"<a href='{data.get('media_url', '')}'>Медиафайл</a>"
     )
     await message.answer(response_text, parse_mode="HTML")
+
+# --- Новые API эндпоинты для админ-панели ---
+
+@app.route('/api/admin/connections')
+def get_admin_connections():
+    user_id_str = request.args.get('user_id')
+    if not user_id_str or int(user_id_str) != ADMIN_ID:
+        abort(403) # Доступ запрещен
+    try:
+        connections = load_json_file(CONNECTIONS_FILE)
+        return jsonify(connections)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/admin/user_data')
+def get_admin_user_data():
+    user_id_str = request.args.get('user_id')
+    if not user_id_str or int(user_id_str) != ADMIN_ID:
+        abort(403) # Доступ запрещен
+    try:
+        user_data = read_user_data()
+        return jsonify(user_data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/admin')
+def admin_page():
+    # Отдаем статичный файл admin.html
+    return app.send_static_file('admin.html')
+
+# --- Команды бота ---
+
+@dp.message(Command("admin"))
+async def admin_command(message: types.Message):
+    if message.from_user.id == ADMIN_ID:
+        # ЗАМЕНИ НА СВОЙ РЕАЛЬНЫЙ URL (например, ngrok)
+        admin_url = "https://your-domain.com/admin" 
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="🔑 Открыть админ-панель", web_app=WebAppInfo(url=admin_url))]
+            ]
+        )
+        await message.answer("Добро пожаловать в панель администратора.", reply_markup=keyboard)
+    else:
+        await message.answer("У вас нет прав для доступа к этой команде.")
 
 async def main():
     # Запускаем Flask в отдельном потоке

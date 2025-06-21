@@ -120,16 +120,14 @@
       </div></li>`;
     }
     function getGiftsFromStorage() {
-      return JSON.parse(localStorage.getItem('my_gifts') || '[]');
+      // Эта функция больше не нужна в таком виде, данные приходят с сервера
+      return []; 
     }
-    function updateGiftsList() {
-      const gifts = getGiftsFromStorage();
+    function updateGiftsList(gifts) { // Теперь функция принимает подарки как аргумент
       document.getElementById('my-gifts-list').innerHTML = gifts.length
         ? gifts.map((gift, index) => renderGiftCard(gift, index)).join('')
         : '<div style="color:#888;margin-top:30px;">Подарков пока нет</div>';
     }
-    // Показываем пример при открытии вкладки "Мои подарки"
-    document.querySelector('[data-tab="gifts"]').addEventListener('click', updateGiftsList);
 
     // Логика для модального окна вывода
     const withdrawModalOverlay = document.getElementById('withdraw-info-modal-overlay');
@@ -143,11 +141,14 @@
       withdrawModalOverlay.classList.add('visible');
     }
     
-    document.getElementById('my-gifts-list').addEventListener('click', (e) => {
+    document.getElementById('my-gifts-list').addEventListener('click', async (e) => {
       if (e.target && e.target.classList.contains('gift-card-btn')) {
         const giftIndex = e.target.dataset.giftIndex;
-        const gift = getGiftsFromStorage()[giftIndex];
-        if (gift) {
+        // Получаем свежие данные с сервера, чтобы убедиться, что подарок еще там
+        const response = await fetch(`/api/get_user_status?user_id=${currentUser.id}`);
+        const data = await response.json();
+        if (data.gifts && data.gifts[giftIndex]) {
+          const gift = data.gifts[giftIndex];
           showWithdrawModal(gift);
         }
       }

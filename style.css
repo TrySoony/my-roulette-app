@@ -495,3 +495,61 @@ ul#my-gifts-list {
   cursor: pointer;
   width: 100%;
 }
+
+/* Стили для админ-панели */
+.admin-container {
+    max-width: 900px;
+    margin: 20px auto;
+    padding: 20px;
+    font-family: 'Segoe UI', sans-serif;
+}
+.admin-container .section {
+    background: #fff;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    margin-bottom: 30px;
+}
+.admin-container h1, .admin-container h2 {
+    color: #e91e63;
+}
+.admin-container table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+.admin-container th, .admin-container td {
+    padding: 12px 15px;
+    border-bottom: 1px solid #eee;
+    text-align: left;
+}
+.admin-container th {
+    background-color: #fcfcfc;
+}
+.user-card {
+    background: #fdfdff;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+.admin-prize-list {
+    list-style: none;
+    padding: 0;
+    margin-top: 10px;
+}
+.admin-prize-list li {
+    display: flex;
+    align-items: center;
+    font-size: 0.9rem;
+    padding: 5px 0;
+}
+.admin-prize-list img {
+    width: 30px;
+    height: 30px;
+    margin-right: 10px;
+}
+.admin-prize-list small {
+    margin-left: auto;
+    color: #888;
+}
