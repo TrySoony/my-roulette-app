@@ -63,10 +63,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="user-actions">
                          <button class="button primary small add-prize-btn">Выдать приз</button>
                          <button class="button secondary small add-attempt-btn">+1 Попытка</button>
+                         <button class="button danger small reset-attempts-btn">Сбросить попытки</button>
                     </div>
                 </div>
                 <div class="user-card-body">
                     <p>Попыток использовано: <span class="attempts-count">${userData.attempts}</span></p>
+                    <p>Доступно попыток: <span class="attempts-left">${2 - userData.attempts}</span></p>
                     <h4>Призы:</h4>
                     <ul class="gift-list">${giftsHTML || '<p>Нет призов</p>'}</ul>
                 </div>
@@ -82,6 +84,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (e.target.classList.contains('add-attempt-btn')) {
             addAttempt(userId);
+        }
+        if (e.target.classList.contains('reset-attempts-btn')) {
+            resetAttempts(userId);
         }
         if (e.target.classList.contains('remove-gift-btn')) {
             const giftIndex = parseInt(e.target.dataset.index, 10);
@@ -145,8 +150,23 @@ document.addEventListener('DOMContentLoaded', () => {
         if (result && result.success) {
             // Обновляем UI
             const attemptsSpan = document.querySelector(`.user-card[data-user-id="${userId}"] .attempts-count`);
+            const attemptsLeftSpan = document.querySelector(`.user-card[data-user-id="${userId}"] .attempts-left`);
             if (attemptsSpan) attemptsSpan.textContent = result.attempts;
+            if (attemptsLeftSpan) attemptsLeftSpan.textContent = 2 - result.attempts;
             showSuccess("Попытка добавлена!");
+        }
+    }
+
+    async function resetAttempts(userId) {
+        if (!confirm('Вы уверены, что хотите сбросить попытки этого пользователя?')) return;
+        const result = await apiCall('/api/admin/reset_attempts', { user_id: userId });
+        if (result && result.success) {
+            // Обновляем UI
+            const attemptsSpan = document.querySelector(`.user-card[data-user-id="${userId}"] .attempts-count`);
+            const attemptsLeftSpan = document.querySelector(`.user-card[data-user-id="${userId}"] .attempts-left`);
+            if (attemptsSpan) attemptsSpan.textContent = '0';
+            if (attemptsLeftSpan) attemptsLeftSpan.textContent = '2';
+            showSuccess("Попытки сброшены!");
         }
     }
 

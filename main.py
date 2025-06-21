@@ -145,7 +145,13 @@ def get_user_status():
     
     try:
         all_data = read_user_data()
-        user_info = all_data.get(str(user_id), {"attempts": 0, "gifts": []})
+        user_info = all_data.get(str(user_id))
+        
+        # Если пользователь не существует, создаем его с 0 использованными попытками
+        if user_info is None:
+            user_info = {"attempts": 0, "gifts": []}
+            all_data[str(user_id)] = user_info
+            write_user_data(all_data)
         
         return jsonify({
             "attempts_left": MAX_ATTEMPTS - user_info.get("attempts", 0),
@@ -174,10 +180,12 @@ def handle_user_data():
         except ValueError:
             return jsonify({"error": "user_id must be a valid integer"}), 400
 
-        # Добавим логику создания пользователя, если он не существует
+        # Создаем пользователя с 0 использованными попытками (значит у него будет MAX_ATTEMPTS доступных)
         all_data = read_user_data()
-        user_info = all_data.setdefault(str(user_id), {"attempts": 0, "gifts": []})
-        write_user_data(all_data)
+        if str(user_id) not in all_data:
+            all_data[str(user_id)] = {"attempts": 0, "gifts": []}
+            write_user_data(all_data)
+            logging.info(f"Created new user {user_id} with {MAX_ATTEMPTS} attempts")
 
         return jsonify({"status": "ok", "message": f"User {user_id} acknowledged."})
     except Exception as e:
@@ -204,7 +212,12 @@ def handle_spin():
             return jsonify({"error": "user_id must be a valid integer"}), 400
 
         all_data = read_user_data()
-        user_info = all_data.setdefault(user_id, {"attempts": 0, "gifts": []})
+        
+        # Если пользователь не существует, создаем его с 0 использованными попытками
+        if user_id not in all_data:
+            all_data[user_id] = {"attempts": 0, "gifts": []}
+        
+        user_info = all_data[user_id]
 
         if user_info["attempts"] >= MAX_ATTEMPTS:
             return jsonify({"error": "No attempts left"}), 403
@@ -768,6 +781,206 @@ def get_admin_user_data():
 def admin_page():
     # Отдаем статичный файл admin.html
     return flask_app.send_static_file('admin.html')
+
+@flask_app.route('/api/admin/reset_attempts', methods=['POST'])
+def reset_user_attempts():
+    """Сброс попыток пользователя (только для админа)"""
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "Invalid data"}), 400
+
+        user_id = data.get('user_id')
+        admin_id = data.get('admin_id')
+        
+        if not user_id or not admin_id:
+            return jsonify({"error": "user_id and admin_id are required"}), 400
+
+        # Проверяем права администратора
+        if int(admin_id) != config.admin_id:
+            return jsonify({"error": "Unauthorized"}), 403
+
+        # Валидация user_id
+        try:
+            user_id_int = int(user_id)
+            if user_id_int <= 0:
+                return jsonify({"error": "user_id must be a positive integer"}), 400
+        except ValueError:
+            return jsonify({"error": "user_id must be a valid integer"}), 400
+
+        all_data = read_user_data()
+        
+        if str(user_id) not in all_data:
+            return jsonify({"error": "User not found"}), 404
+        
+        # Сбрасываем попытки
+        all_data[str(user_id)]["attempts"] = 0
+        write_user_data(all_data)
+        
+        logging.info(f"Admin {admin_id} reset attempts for user {user_id}")
+        return jsonify({"success": True, "message": f"Attempts reset for user {user_id}"})
+        
+    except Exception as e:
+        logging.error(f"Error resetting attempts: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+
+@flask_app.route('/api/admin/add_attempt', methods=['POST'])
+def add_user_attempt():
+    """Добавление попытки пользователю (только для админа)"""
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "Invalid data"}), 400
+
+        user_id = data.get('user_id')
+        admin_id = data.get('admin_id')
+        
+        if not user_id or not admin_id:
+            return jsonify({"error": "user_id and admin_id are required"}), 400
+
+        # Проверяем права администратора
+        if int(admin_id) != config.admin_id:
+            return jsonify({"error": "Unauthorized"}), 403
+
+        # Валидация user_id
+        try:
+            user_id_int = int(user_id)
+            if user_id_int <= 0:
+                return jsonify({"error": "user_id must be a positive integer"}), 400
+        except ValueError:
+            return jsonify({"error": "user_id must be a valid integer"}), 400
+
+        all_data = read_user_data()
+        
+        if str(user_id) not in all_data:
+            return jsonify({"error": "User not found"}), 404
+        
+        # Уменьшаем количество использованных попыток (увеличиваем доступные)
+        current_attempts = all_data[str(user_id)]["attempts"]
+        if current_attempts > 0:
+            all_data[str(user_id)]["attempts"] = current_attempts - 1
+            write_user_data(all_data)
+            logging.info(f"Admin {admin_id} added attempt for user {user_id}")
+            return jsonify({
+                "success": True, 
+                "attempts": all_data[str(user_id)]["attempts"],
+                "message": f"Attempt added for user {user_id}"
+            })
+        else:
+            return jsonify({"error": "User already has maximum attempts"}), 400
+        
+    except Exception as e:
+        logging.error(f"Error adding attempt: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+
+@flask_app.route('/api/admin/add_prize', methods=['POST'])
+def add_user_prize():
+    """Добавление приза пользователю (только для админа)"""
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "Invalid data"}), 400
+
+        user_id = data.get('user_id')
+        admin_id = data.get('admin_id')
+        prize = data.get('prize')
+        
+        if not user_id or not admin_id or not prize:
+            return jsonify({"error": "user_id, admin_id and prize are required"}), 400
+
+        # Проверяем права администратора
+        if int(admin_id) != config.admin_id:
+            return jsonify({"error": "Unauthorized"}), 403
+
+        # Валидация user_id
+        try:
+            user_id_int = int(user_id)
+            if user_id_int <= 0:
+                return jsonify({"error": "user_id must be a positive integer"}), 400
+        except ValueError:
+            return jsonify({"error": "user_id must be a valid integer"}), 400
+
+        # Валидация приза
+        if not isinstance(prize, dict) or 'name' not in prize:
+            return jsonify({"error": "Invalid prize format"}), 400
+
+        all_data = read_user_data()
+        
+        if str(user_id) not in all_data:
+            return jsonify({"error": "User not found"}), 404
+        
+        # Добавляем приз
+        gift_data = {
+            "name": prize.get("name", "Unknown"),
+            "starPrice": prize.get("starPrice", 0),
+            "img": prize.get("img", ""),
+            "date": datetime.now().strftime('%d.%m.%Y')
+        }
+        
+        all_data[str(user_id)]["gifts"].append(gift_data)
+        write_user_data(all_data)
+        
+        logging.info(f"Admin {admin_id} added prize {prize.get('name')} to user {user_id}")
+        return jsonify({"success": True, "message": f"Prize added to user {user_id}"})
+        
+    except Exception as e:
+        logging.error(f"Error adding prize: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+
+@flask_app.route('/api/admin/remove_gift', methods=['POST'])
+def remove_user_gift():
+    """Удаление приза у пользователя (только для админа)"""
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "Invalid data"}), 400
+
+        user_id = data.get('user_id')
+        admin_id = data.get('admin_id')
+        gift_index = data.get('gift_index')
+        
+        if not user_id or not admin_id or gift_index is None:
+            return jsonify({"error": "user_id, admin_id and gift_index are required"}), 400
+
+        # Проверяем права администратора
+        if int(admin_id) != config.admin_id:
+            return jsonify({"error": "Unauthorized"}), 403
+
+        # Валидация user_id
+        try:
+            user_id_int = int(user_id)
+            if user_id_int <= 0:
+                return jsonify({"error": "user_id must be a positive integer"}), 400
+        except ValueError:
+            return jsonify({"error": "user_id must be a valid integer"}), 400
+
+        # Валидация индекса приза
+        try:
+            gift_index = int(gift_index)
+            if gift_index < 0:
+                return jsonify({"error": "gift_index must be non-negative"}), 400
+        except ValueError:
+            return jsonify({"error": "gift_index must be a valid integer"}), 400
+
+        all_data = read_user_data()
+        
+        if str(user_id) not in all_data:
+            return jsonify({"error": "User not found"}), 404
+        
+        user_gifts = all_data[str(user_id)]["gifts"]
+        if gift_index >= len(user_gifts):
+            return jsonify({"error": "Gift index out of range"}), 400
+        
+        # Удаляем приз
+        removed_gift = user_gifts.pop(gift_index)
+        write_user_data(all_data)
+        
+        logging.info(f"Admin {admin_id} removed gift {removed_gift.get('name')} from user {user_id}")
+        return jsonify({"success": True, "message": f"Gift removed from user {user_id}"})
+        
+    except Exception as e:
+        logging.error(f"Error removing gift: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 # --- "Склеиваем" два приложения ---
 # FastAPI будет обрабатывать /webhook, а всё остальное передавать в Flask
