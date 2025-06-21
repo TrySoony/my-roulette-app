@@ -47,28 +47,38 @@ app = FastAPI() # Наше "главное" новое приложение
 # --- Webhook эндпоинт на FastAPI с проверкой подписи ---
 @app.post("/webhook")
 async def bot_webhook(request: FastAPIRequest):
+    headers = dict(request.headers)
+    logging.info(f"Webhook triggered. Headers: {headers}")
     try:
         # Проверяем заголовки для валидации подписи Telegram
-        headers = dict(request.headers)
-        if 'X-Telegram-Bot-Api-Secret-Token' in headers:
-            if headers['X-Telegram-Bot-Api-Secret-Token'] != config.webhook_secret:
-                logging.warning("Invalid webhook secret token")
+        if 'x-telegram-bot-api-secret-token' in headers:
+            if headers['x-telegram-bot-api-secret-token'] != config.webhook_secret:
+                logging.warning("Invalid webhook secret token received.")
                 return {"ok": False, "error": "Unauthorized"}, 401
-        
+        else:
+            logging.warning("Webhook request is missing the secret token header.")
+            # Можно вернуть ошибку, если вы ожидаете токен всегда
+            # return {"ok": False, "error": "Unauthorized"}, 401
+
         update_data = await request.json()
         update = types.Update.model_validate(update_data, context={"bot": bot})
         await dp.feed_update(bot, update)
         return {"ok": True}
     except Exception as e:
-        logging.error(f"Error processing webhook: {e}")
+        logging.error(f"Error processing webhook: {e}", exc_info=True)
         return {"ok": False, "error": str(e)}, 500
 
 # --- Жизненный цикл (на FastAPI) ---
 @app.on_event("startup")
 async def on_startup():
     if config.webhook_url:
-        await bot.set_webhook(url=f"{config.webhook_url}/webhook", drop_pending_updates=True)
-        logging.warning(f"Webhook set to {config.webhook_url}/webhook")
+        # Устанавливаем вебхук с секретным токеном
+        await bot.set_webhook(
+            url=f"{config.webhook_url}/webhook",
+            drop_pending_updates=True,
+            secret_token=config.webhook_secret
+        )
+        logging.warning(f"Webhook set to {config.webhook_url}/webhook with secret token.")
 
 @app.on_event("shutdown")
 async def on_shutdown():
