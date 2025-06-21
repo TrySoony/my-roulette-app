@@ -16,9 +16,9 @@ const prizes = [
     img: "https://telegram.org/file/464001154/1/b5WbZ2z3G8E.33810/a56396e8e50f55e347" 
   },
   { 
-    name: "NekoHelmet", 
-    starPrice: 14000, 
-    img: "https://t.me/nft/NekoHelmet-426" 
+    name: "Дракон", 
+    starPrice: 25, 
+    img: "https://telegram.org/file/464001154/1/b28dff4e2d3.33842/b4d75f284d72863f68" 
   },
   { 
     name: "Кот-учёный", 
