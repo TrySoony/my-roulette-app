@@ -9,13 +9,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let adminId = null;
 
     function initializeApp() {
-        alert('V1.2: Initializing Admin App...');
         try {
             const tg = window.Telegram.WebApp;
             tg.ready();
             tg.expand();
-
-            alert(`V1.2: tg.initDataUnsafe: ${JSON.stringify(tg.initDataUnsafe, null, 2)}`);
 
             if (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
                 adminId = tg.initDataUnsafe.user.id;
@@ -27,7 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 spinner.style.display = 'none';
             }
         } catch(e) {
-            showError(`V1.2 Critical initialization error: ${e.message}. The app must be run from Telegram.`);
+            showError(`Критическая ошибка инициализации: ${e.message}. Приложение должно запускаться из Telegram.`);
             spinner.style.display = 'none';
         }
     }
