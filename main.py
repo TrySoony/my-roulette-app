@@ -1,6 +1,6 @@
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.enums import ParseMode
-from aiogram.filters import Command
+from aiogram.filters import Command, CommandStart
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from aiogram.client.default import DefaultBotProperties
 import logging
@@ -305,32 +305,29 @@ async def admin_add_prize(request: Request):
 
 # --- 5. Обработчики команд Aiogram ---
 
-@dp.message(Command("start"))
-async def command_start_handler(message: Message):
-    if not message.from_user: return
-    app_url = config.webhook_url
-    if not app_url: 
-        logging.error("WEBHOOK_URL is not set, cannot send WebApp button.")
-        return await message.answer("Веб-приложение временно недоступно.")
-    text = (
-        "🎁 <b>Добро пожаловать в рулетку!</b>\n\n"
-        "Нажмите кнопку ниже, чтобы начать игру."
+@dp.message(CommandStart())
+async def command_start_handler(message: Message) -> None:
+    """Обработчик команды /start"""
+    keyboard = types.InlineKeyboardMarkup(
+        inline_keyboard=[
+            [types.InlineKeyboardButton(text="🎲 Открыть рулетку", web_app=types.WebAppInfo(url=config.webapp_url))]
+        ]
     )
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🎰 Открыть рулетку", web_app=WebAppInfo(url=app_url))]
-    ])
-    await message.answer(text, reply_markup=keyboard)
+    await message.answer(f"Привет, {message.from_user.full_name}! Нажми на кнопку ниже, чтобы открыть рулетку.", reply_markup=keyboard)
 
-@dp.message(Command("admin"))
-async def command_admin_handler(message: Message):
-    if not (message.from_user and message.from_user.id == config.admin_id):
-        return await message.answer("Доступ запрещен.")
-    
-    admin_url = f"{config.webhook_url}/admin.html"
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔑 Открыть админ-панель", web_app=WebAppInfo(url=admin_url))]
-    ])
-    await message.answer("Админ-панель:", reply_markup=keyboard)
+@dp.message(lambda message: message.text == "/admin")
+async def admin_command_handler(message: Message) -> None:
+    """Обработчик команды /admin"""
+    if message.from_user.id != config.admin_id:
+        await message.answer("У вас нет прав администратора.")
+        return
+        
+    keyboard = types.InlineKeyboardMarkup(
+        inline_keyboard=[
+            [types.InlineKeyboardButton(text="👑 Открыть админ-панель", web_app=types.WebAppInfo(url=f"{config.webapp_url}/admin.html"))]
+        ]
+    )
+    await message.answer("Панель администратора:", reply_markup=keyboard)
 
 # --- 6. Раздача статических файлов ---
 

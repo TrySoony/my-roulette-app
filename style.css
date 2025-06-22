@@ -703,52 +703,149 @@ ul#my-gifts-list {
 }
 
 .modal-content {
-    position: relative;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.win-modal, .withdraw-modal {
     background: white;
-    margin: 10% auto;
     padding: 20px;
-    width: 90%;
-    max-width: 500px;
-    border-radius: 10px;
+    border-radius: 12px;
+    text-align: center;
+    max-width: 90%;
+    width: 400px;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
-.close-button {
-    position: absolute;
-    right: 10px;
-    top: 10px;
-    font-size: 24px;
-    cursor: pointer;
-    color: #586069;
+.prize-display {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 20px 0;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
 }
 
-.form-group {
-    margin-bottom: 15px;
+.prize-display img {
+    width: 80px;
+    height: 80px;
+    object-fit: contain;
+    margin-right: 15px;
 }
 
-.form-group label {
-    display: block;
-    margin-bottom: 5px;
-    color: #24292e;
+.prize-info {
+    text-align: left;
 }
 
-.form-group input {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid #e1e4e8;
+.prize-info h3 {
+    margin: 0 0 5px 0;
+    color: #333;
+}
+
+.prize-value {
+    font-size: 18px;
+    color: #ff9800;
+    margin: 0;
+}
+
+.command-box {
+    background: #f8f9fa;
+    padding: 10px;
     border-radius: 6px;
-    font-size: 14px;
+    margin: 15px 0;
 }
 
-.button.primary {
-    background: #2ea44f;
+.command-box code {
+    font-family: monospace;
+    color: #e91e63;
+}
+
+.modal-close-btn {
+    background: #4CAF50;
     color: white;
     border: none;
-    border-radius: 6px;
     padding: 10px 20px;
-    font-size: 14px;
+    border-radius: 6px;
     cursor: pointer;
-    width: 100%;
+    font-size: 16px;
+    margin-top: 15px;
+}
+
+.modal-close-btn:hover {
+    background: #45a049;
+}
+
+/* Стили для списка подарков */
+#my-gifts-list {
+    list-style: none;
+    padding: 0;
+    margin: 20px 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.gift-card {
+    background: white;
+    border-radius: 12px;
+    padding: 15px;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s;
+}
+
+.gift-card:hover {
+    transform: translateY(-5px);
+}
+
+.gift-card img {
+    width: 100px;
+    height: 100px;
+    object-fit: contain;
+    margin-bottom: 10px;
+}
+
+.gift-card-title {
+    font-size: 16px;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 5px;
+}
+
+.gift-card-price {
+    color: #ff9800;
+    font-size: 18px;
+    margin-bottom: 5px;
+}
+
+.gift-card-date {
+    color: #666;
+    font-size: 14px;
+    margin-bottom: 10px;
+}
+
+.gift-card-btn {
+    background: #2196F3;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.2s;
+}
+
+.gift-card-btn:hover {
+    background: #1976D2;
 }
 
 /* Спиннер загрузки */
