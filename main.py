@@ -19,6 +19,7 @@ from scraper import get_gift_data # Добавить вверху файла
 from datetime import datetime
 from fastapi import FastAPI, Request as FastAPIRequest
 from fastapi.middleware.wsgi import WSGIMiddleware
+from fastapi.responses import JSONResponse
 
 # --- Конфигурация логирования в самом начале ---
 # Устанавливаем базовый уровень, чтобы поймать ошибки конфигурации
@@ -56,19 +57,19 @@ async def bot_webhook(request: FastAPIRequest):
         if 'x-telegram-bot-api-secret-token' in headers:
             if headers['x-telegram-bot-api-secret-token'] != config.webhook_secret:
                 logging.warning("Invalid webhook secret token received.")
-                return {"ok": False, "error": "Unauthorized"}, 401
+                return JSONResponse(content={"ok": False, "error": "Unauthorized"}, status_code=401)
         else:
             logging.warning("Webhook request is missing the secret token header.")
             # Можно вернуть ошибку, если вы ожидаете токен всегда
-            # return {"ok": False, "error": "Unauthorized"}, 401
+            # return JSONResponse(content={"ok": False, "error": "Unauthorized"}, status_code=401)
 
         update_data = await request.json()
         update = types.Update.model_validate(update_data, context={"bot": bot})
         await dp.feed_update(bot, update)
-        return {"ok": True}
+        return JSONResponse(content={"ok": True})
     except Exception as e:
         logging.error(f"Error processing webhook: {e}", exc_info=True)
-        return {"ok": False, "error": str(e)}, 500
+        return JSONResponse(content={"ok": False, "error": str(e)}, status_code=500)
 
 # --- Жизненный цикл (на FastAPI) ---
 @app.on_event("startup")
