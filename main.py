@@ -253,6 +253,53 @@ async def webhook_handler(request: Request):
 # --- 8. Startup Event ---
 @app.on_event("startup")
 async def on_startup():
-    webhook_url = f"{config.webapp_url}/webhook"
-    await bot.set_webhook(url=webhook_url)
-    logging.info(f"Webhook has been set to {webhook_url}") 
+    try:
+        webhook_url = f"{config.webapp_url}/webhook"
+        webhook_info = await bot.get_webhook_info()
+        
+        # Если вебхук уже установлен на нужный URL, не меняем его
+        if webhook_info.url != webhook_url:
+            # Для Telegram требуется HTTPS
+            if not webhook_url.startswith("https://"):
+                logging.error(f"Webhook URL must start with HTTPS. Current URL: {webhook_url}")
+                return
+                
+            await bot.delete_webhook()
+            await bot.set_webhook(
+                url=webhook_url,
+                drop_pending_updates=True,
+                allowed_updates=["message", "callback_query"]
+            )
+            logging.info(f"Webhook has been set to {webhook_url}")
+        else:
+            logging.info(f"Webhook is already set to {webhook_url}")
+    except Exception as e:
+        logging.error(f"Failed to set webhook: {e}")
+        # Не прерываем запуск приложения из-за ошибки вебхука
+        # Это позволит хотя бы веб-интерфейсу работать
+
+# --- 9. Shutdown Event ---
+@app.on_event("shutdown")
+async def on_shutdown():
+    try:
+        await bot.session.close()
+        logging.info("Bot session closed")
+    except Exception as e:
+        logging.error(f"Error during shutdown: {e}")
+
+# --- 10. Root endpoint ---
+@app.get("/")
+async def root():
+    return FileResponse("index.html")
+
+# --- 11. Webhook endpoint ---
+@app.post("/webhook")
+async def webhook_handler(request: Request):
+    try:
+        data = await request.json()
+        update = types.Update(**data)
+        await dp.feed_update(bot=bot, update=update)
+        return Response(status_code=200)
+    except Exception as e:
+        logging.error(f"Error in webhook handler: {e}")
+        return Response(status_code=500) 
