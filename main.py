@@ -19,7 +19,6 @@ from scraper import get_gift_data # Добавить вверху файла
 from datetime import datetime
 from fastapi import FastAPI, Request as FastAPIRequest
 from fastapi.middleware.wsgi import WSGIMiddleware
-from config import config
 
 # --- Конфигурация логирования в самом начале ---
 # Устанавливаем базовый уровень, чтобы поймать ошибки конфигурации
@@ -43,6 +42,9 @@ bot = Bot(config.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HT
 dp = Dispatcher()
 flask_app = Flask(__name__, static_folder=None) # Отключаем стандартную обработку static
 app = FastAPI() # Наше "главное" новое приложение
+
+# --- Интеграция Flask с FastAPI ---
+app.mount("/", WSGIMiddleware(flask_app))
 
 # --- Webhook эндпоинт на FastAPI с проверкой подписи ---
 @app.post("/webhook")
@@ -251,7 +253,17 @@ def handle_spin():
         user_info["attempts"] += 1
 
         # Выбираем случайный приз (с учетом весов, если они есть)
-        prizes_from_js = load_prizes_from_js()
+        # Загружаем призы из prizes.js
+        prizes_from_js = [
+            {"name": "Nail Bracelet", "starPrice": 100000, "img": "images/nail_bracelet.png"},
+            {"name": "Bonded Ring", "starPrice": 37500, "img": "images/bonded_ring.png"},
+            {"name": "Neko Helmet", "starPrice": 14000, "img": "images/neko_helmet.png"},
+            {"name": "Diamond Ring", "starPrice": 6700, "img": "images/diamond_ring.png"},
+            {"name": "Love Potion", "starPrice": 4200, "img": "images/love_potion.png"},
+            {"name": "Easter Egg", "starPrice": 1050, "img": "images/easter_egg.png"},
+            {"name": "Light Sword", "starPrice": 1450, "img": "images/light_sword.png"},
+        ]
+        
         if not prizes_from_js:
             logging.error("Could not load prizes from prizes.js")
             return jsonify({"error": "Internal server error"}), 500
@@ -435,26 +447,37 @@ CONNECTIONS_FILE = "business_connections.json"
 
 def load_json_file(filename):
     try:
-        with open(filename, "r") as f:
+        with open(filename, "r", encoding="utf-8") as f:
             content = f.read().strip()
             if not content:
                 return [] 
             return json.loads(content)
     except FileNotFoundError:
+        logging.info(f"File {filename} not found, returning empty list")
         return []
     except json.JSONDecodeError as e:
-        logging.exception("Ошибка при разборе JSON-файла.")
+        logging.exception(f"Ошибка при разборе JSON-файла {filename}: {e}")
+        return []
+    except Exception as e:
+        logging.exception(f"Неожиданная ошибка при чтении файла {filename}: {e}")
         return []
 
-def get_connection_id_by_user(user_id: int) -> str:
-    import json
-    with open("connections.json", "r") as f:
-        data = json.load(f)
-    return data.get(str(user_id))
+def get_connection_id_by_user(user_id: int) -> str | None:
+    try:
+        with open("connections.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data.get(str(user_id))
+    except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
+        logging.warning(f"Error getting connection ID for user {user_id}: {e}")
+        return None
 
 def load_connections():
-    with open("business_connections.json", "r") as f:
-        return json.load(f)
+    try:
+        with open("business_connections.json", "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        logging.warning(f"Error loading connections: {e}")
+        return []
 
 async def send_welcome_message_to_admin(connection, user_id, _bot):
     try:
@@ -746,7 +769,7 @@ async def gift_info_command(message: types.Message):
 def get_admin_connections():
     user_id_str = request.args.get('user_id')
     if not user_id_str or int(user_id_str) != config.admin_id:
-        abort(403) # Доступ запрещен
+        return jsonify({"error": "Unauthorized"}), 403
     try:
         connections = load_json_file(CONNECTIONS_FILE)
         return jsonify(connections)
@@ -757,7 +780,7 @@ def get_admin_connections():
 def get_admin_user_data():
     user_id_str = request.args.get('user_id')
     if not user_id_str or int(user_id_str) != config.admin_id:
-        abort(403) # Доступ запрещен
+        return jsonify({"error": "Unauthorized"}), 403
     try:
         user_data = read_user_data()
         return jsonify(user_data)
@@ -767,7 +790,7 @@ def get_admin_user_data():
 @flask_app.route('/admin')
 def admin_page():
     # Отдаем статичный файл admin.html
-    return flask_app.send_static_file('admin.html')
+    return send_from_directory('.', 'admin.html')
 
 @flask_app.route('/api/admin/reset_attempts', methods=['POST'])
 def reset_user_attempts():
@@ -968,10 +991,6 @@ def remove_user_gift():
     except Exception as e:
         logging.error(f"Error removing gift: {e}")
         return jsonify({"error": "Internal server error"}), 500
-
-# --- "Склеиваем" два приложения ---
-# FastAPI будет обрабатывать /webhook, а всё остальное передавать в Flask
-app.mount("/", WSGIMiddleware(flask_app))
 
 if __name__ == '__main__':
     import uvicorn

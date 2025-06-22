@@ -3,13 +3,26 @@ const spinBtn = document.getElementById('spin');
 const resultDiv = document.getElementById('result');
 const giftsList = document.getElementById('gifts-list');
 
-let currentUser = {}; // Храним ID пользователя
+let currentUser = { id: null }; // Храним ID пользователя
 let attemptsLeft = 0; // Храним оставшиеся попытки
 let userGifts = [];
 let telegramUser = null;
 
 function showError(message) {
     alert(message);
+}
+
+function showSuccess(message) {
+    alert(message);
+}
+
+function updateGiftsList(gifts) {
+    // Эта функция обновляет список подарков в интерфейсе
+    userGifts = gifts || [];
+    // Если есть функция для обновления UI, вызываем её
+    if (typeof window.updateGiftsList === 'function') {
+        window.updateGiftsList(gifts);
+    }
 }
 
 function initializeApp() {
@@ -286,5 +299,8 @@ async function spinRoulette() {
 
 // При загрузке страницы обновляем состояние кнопки
 updateSpinBtnState();
+
+// Добавляем обработчик события для кнопки спина
+spinBtn.addEventListener('click', spinRoulette);
 
 initializeApp();
