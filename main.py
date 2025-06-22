@@ -8,9 +8,16 @@ import json
 import os
 import random
 from datetime import datetime
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI, Request, HTTPException, Response
+from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
+import hmac
+import hashlib
+import base64
+from urllib.parse import parse_qs
+import time
+import custom_methods
+from config import config
 
 # --- 1. Конфигурация ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -50,32 +57,66 @@ def write_user_data(data):
         logging.error(f"Error writing user data: {e}")
         return False
 
-def verify_telegram_web_app_data(data_str):
-    """Проверяет данные от Telegram Web App и возвращает user_id"""
+def verify_telegram_web_app_data(init_data: str) -> int:
     try:
-        # Здесь должна быть реальная проверка подписи
-        # Для тестирования просто возвращаем admin_id
-        return config.admin_id
+        parsed_data = parse_qs(init_data)
+        
+        if 'user' not in parsed_data:
+            raise ValueError("No user data in init_data")
+            
+        user_data = json.loads(parsed_data['user'][0])
+        user_id = user_data.get('id')
+        
+        if not user_id:
+            raise ValueError("No user ID in init_data")
+            
+        # Проверяем хеш
+        received_hash = parsed_data.get('hash', [None])[0]
+        if not received_hash:
+            raise ValueError("No hash in init_data")
+            
+        data_check_string = '\n'.join(
+            f"{key}={value[0]}" for key, value in sorted(parsed_data.items()) 
+            if key != 'hash'
+        )
+        
+        secret_key = hmac.new(
+            key=b"WebAppData",
+            msg=config.bot_token.encode(),
+            digestmod=hashlib.sha256
+        ).digest()
+        
+        calculated_hash = hmac.new(
+            key=secret_key,
+            msg=data_check_string.encode(),
+            digestmod=hashlib.sha256
+        ).hexdigest()
+        
+        if calculated_hash != received_hash:
+            raise ValueError("Hash mismatch")
+            
+        return user_id
+        
     except Exception as e:
-        logging.error(f"Error verifying telegram data: {e}")
-        raise HTTPException(status_code=401, detail="Invalid telegram data")
+        logging.error(f"Error verifying Telegram data: {e}")
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
 # --- 4. FastAPI эндпоинты ---
 
 @app.post("/webhook")
-async def bot_webhook(request: Request):
+async def webhook_handler(request: Request):
     """ Эндпоинт для приема обновлений от Telegram """
     if config.webhook_secret and request.headers.get('x-telegram-bot-api-secret-token') != config.webhook_secret:
         logging.warning("Invalid secret token received")
         raise HTTPException(status_code=401, detail="Invalid secret token")
     try:
-        update_data = await request.json()
-        update = types.Update.model_validate(update_data, context={"bot": bot})
-        await dp.feed_update(bot, update)
-        return {"ok": True}
+        data = await request.json()
+        update = types.Update(**data)
+        await dp.feed_update(bot=bot, update=update)
+        return Response(status_code=200)
     except Exception as e:
-        logging.error(f"Error in webhook: {e}", exc_info=True)
-        return JSONResponse(content={"ok": False, "error": str(e)}, status_code=500)
+        logging.error(f"Error in webhook handler: {e}")
+        return Response(status_code=500)
 
 @app.get('/api/get_user_status')
 def get_user_status(user_id: str):

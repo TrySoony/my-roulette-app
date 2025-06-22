@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalUserIdInput = document.getElementById('modal-user-id');
     
     let adminId = null;
+    let initData = '';
 
     function initializeApp() {
         try {
@@ -16,6 +17,8 @@ document.addEventListener('DOMContentLoaded', () => {
             tg.ready();
             tg.expand();
 
+            initData = tg.initData;
+            
             if (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
                 adminId = tg.initDataUnsafe.user.id;
                 fetchData();
@@ -37,7 +40,11 @@ document.addEventListener('DOMContentLoaded', () => {
         spinner.style.display = 'flex';
         userList.innerHTML = '';
         try {
-            const response = await fetch('/api/admin/user_data');
+            const response = await fetch('/api/admin/user_data', {
+                headers: {
+                    'telegram-web-app-data': initData
+                }
+            });
             if (!response.ok) {
                 throw new Error('Failed to fetch user data');
             }
