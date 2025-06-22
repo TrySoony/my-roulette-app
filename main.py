@@ -3,7 +3,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher, types, F
 from config import config
 import api_routes
 import admin_routes
@@ -40,6 +40,62 @@ templates = Jinja2Templates(directory=".")
 # Инициализация бота
 bot = Bot(token=config.bot_token)
 dp = Dispatcher()
+
+# События приложения
+@app.on_event("startup")
+async def on_startup():
+    """Действия при запуске приложения"""
+    logger.info("Starting up...")
+    webhook_url = f"{config.webhook_url}/webhook"
+    webhook_info = await bot.get_webhook_info()
+    
+    if webhook_info.url != webhook_url:
+        logger.info(f"Setting webhook to {webhook_url}")
+        await bot.set_webhook(
+            url=webhook_url,
+            drop_pending_updates=True
+        )
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    """Действия при остановке приложения"""
+    logger.info("Shutting down...")
+    await bot.session.close()
+
+# Обработчики команд бота
+@dp.message(F.text == "/start")
+async def cmd_start(message: types.Message):
+    """Обработчик команды /start"""
+    try:
+        await message.answer(
+            "Привет! Я бот для розыгрыша призов. Нажми на кнопку ниже, чтобы открыть рулетку.",
+            reply_markup=types.InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [types.InlineKeyboardButton(
+                        text="🎲 Открыть рулетку",
+                        web_app=types.WebAppInfo(url=f"{config.webhook_url}")
+                    )]
+                ]
+            )
+        )
+    except Exception as e:
+        logger.error(f"Error in start command: {e}")
+        await message.answer("Произошла ошибка. Попробуйте позже.")
+
+@dp.message(F.text == "/help")
+async def cmd_help(message: types.Message):
+    """Обработчик команды /help"""
+    try:
+        await message.answer(
+            "🎮 Как играть:\n\n"
+            "1. Нажмите кнопку 'Открыть рулетку'\n"
+            "2. Крутите колесо и выигрывайте призы\n"
+            "3. Собирайте коллекцию подарков\n\n"
+            "У вас есть 2 попытки в день. Удачи! 🍀"
+        )
+    except Exception as e:
+        logger.error(f"Error in help command: {e}")
+        await message.answer("Произошла ошибка. Попробуйте позже.")
 
 # Подключение роутеров
 app.include_router(api_routes.router)
