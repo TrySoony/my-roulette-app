@@ -15,6 +15,7 @@ class Config:
     webhook_secret: Optional[str] = None
     max_attempts: int = 2
     debug: bool = False
+    webapp_url: str = "https://my-roulette-app-4.onrender.com/"
     
     def __post_init__(self):
         """Валидация конфигурации после инициализации"""
@@ -51,6 +52,7 @@ def load_config() -> Config:
     webhook_secret = os.getenv("WEBHOOK_SECRET")
     max_attempts = int(os.getenv("MAX_ATTEMPTS", "2"))
     debug = os.getenv("DEBUG", "false").lower() == "true"
+    webapp_url = os.getenv("WEBAPP_URL", "")
     
     return Config(
         bot_token=bot_token,
@@ -58,7 +60,8 @@ def load_config() -> Config:
         webhook_url=webhook_url,
         webhook_secret=webhook_secret,
         max_attempts=max_attempts,
-        debug=debug
+        debug=debug,
+        webapp_url=webapp_url
     )
 
 # Глобальный экземпляр конфигурации

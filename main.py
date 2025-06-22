@@ -1,21 +1,21 @@
-from aiogram import Bot, Dispatcher, types, F
+from fastapi import FastAPI, Request, HTTPException, Response
+from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from aiogram import Bot, Dispatcher, types
 from aiogram.enums import ParseMode
-from aiogram.filters import Command, CommandStart
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
-from aiogram.client.default import DefaultBotProperties
-import logging
+from aiogram.filters import CommandStart, Command
+from aiogram.types import Message, WebAppInfo, InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+from aiohttp import web
 import json
 import os
-import random
-from datetime import datetime
-from fastapi import FastAPI, Request, HTTPException, Response
-from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
-from fastapi.staticfiles import StaticFiles
+import logging
 import hmac
 import hashlib
 import base64
 from urllib.parse import parse_qs
 import time
+from datetime import datetime
 import custom_methods
 from config import config
 
@@ -30,7 +30,7 @@ except Exception as e:
     raise
 
 # --- 2. Инициализация ---
-bot = Bot(config.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+bot = Bot(config.bot_token)
 dp = Dispatcher()
 app = FastAPI(title="Roulette Bot API")
 
@@ -45,17 +45,11 @@ def read_user_data():
             content = f.read()
             return json.loads(content) if content else {}
     except (json.JSONDecodeError, FileNotFoundError):
-        logging.error("Could not read or parse user_data.json, returning empty dict.")
         return {}
 
-def write_user_data(data):
-    try:
-        with open(USER_DATA_FILE, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-        return True
-    except Exception as e:
-        logging.error(f"Error writing user data: {e}")
-        return False
+def save_user_data(data):
+    with open(USER_DATA_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
 def verify_telegram_web_app_data(init_data: str) -> int:
     try:
@@ -101,86 +95,104 @@ def verify_telegram_web_app_data(init_data: str) -> int:
         logging.error(f"Error verifying Telegram data: {e}")
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-# --- 4. FastAPI эндпоинты ---
+# --- 4. Обработка статических файлов ---
+ALLOWED_FILES = [
+    'index.html', 'admin.html', 'style.css', 'prizes.js', 'roulette.js', 'admin.js',
+    'images/diamond_ring.png', 'images/light_sword.png', 'images/nail_bracelet.png',
+    'images/easter_egg.png', 'images/neko_helmet.png', 'images/bonded_ring.png',
+    'images/love_potion.png'
+]
 
-@app.post("/webhook")
-async def webhook_handler(request: Request):
-    """ Эндпоинт для приема обновлений от Telegram """
-    if config.webhook_secret and request.headers.get('x-telegram-bot-api-secret-token') != config.webhook_secret:
-        logging.warning("Invalid secret token received")
-        raise HTTPException(status_code=401, detail="Invalid secret token")
-    try:
-        data = await request.json()
-        update = types.Update(**data)
-        await dp.feed_update(bot=bot, update=update)
-        return Response(status_code=200)
-    except Exception as e:
-        logging.error(f"Error in webhook handler: {e}")
-        return Response(status_code=500)
+@app.get("/")
+async def root():
+    return FileResponse("index.html")
 
-@app.get('/api/get_user_status')
-def get_user_status(user_id: str):
-    """ API для получения статуса пользователя (попытки, призы) """
-    if not user_id.isdigit(): raise HTTPException(400, "Invalid user_id")
-    all_data = read_user_data()
-    user_info = all_data.get(user_id, {"attempts": 0, "gifts": []})
-    if user_id not in all_data:
-        all_data[user_id] = user_info
-        write_user_data(all_data)
-    return {"attempts_left": MAX_ATTEMPTS - user_info.get("attempts", 0), "gifts": user_info.get("gifts", [])}
+@app.get("/{filepath:path}")
+async def serve_static_files(filepath: str):
+    if filepath == "":
+        filepath = "index.html"
+    
+    if filepath not in ALLOWED_FILES:
+        logging.warning(f"Static file not found or not allowed: {filepath}")
+        return Response(status_code=404)
+    
+    return FileResponse(filepath)
 
-@app.post('/api/user')
-async def handle_user_data(request: Request):
-    """ API для инициализации пользователя в системе """
+# --- 5. API эндпоинты ---
+@app.post("/api/user")
+async def announce_user(request: Request):
     try:
         data = await request.json()
         user_id = data.get('user_id')
-        if not isinstance(user_id, int) or user_id <= 0: raise HTTPException(400, "Invalid user_id")
-        all_data = read_user_data()
-        if str(user_id) not in all_data:
-            all_data[str(user_id)] = {"attempts": 0, "gifts": []}
-            write_user_data(all_data)
-        return {"status": "ok"}
-    except json.JSONDecodeError:
-        raise HTTPException(400, "Invalid JSON")
+        
+        if not user_id:
+            raise HTTPException(status_code=400, detail="No user_id provided")
+            
+        user_data = read_user_data()
+        
+        if str(user_id) not in user_data:
+            user_data[str(user_id)] = {
+                "attempts_left": MAX_ATTEMPTS,
+                "gifts": []
+            }
+            save_user_data(user_data)
+            
+        return {"status": "success"}
+    except Exception as e:
+        logging.error(f"Error in announce_user: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/get_user_status")
+async def get_user_status(user_id: int):
+    try:
+        user_data = read_user_data()
+        user_info = user_data.get(str(user_id), {
+            "attempts_left": MAX_ATTEMPTS,
+            "gifts": []
+        })
+        return user_info
+    except Exception as e:
+        logging.error(f"Error in get_user_status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-@app.post('/api/spin')
-async def handle_spin(request: Request):
-    """ API для совершения прокрутки в рулетке """
-    data = await request.json()
-    user_id = str(data.get('user_id'))
-    if not user_id.isdigit(): raise HTTPException(400, "Invalid user_id")
-    
-    all_data = read_user_data()
-    user_info = all_data.get(user_id, {"attempts": 0, "gifts": []})
-    
-    if user_info.get("attempts", 0) >= MAX_ATTEMPTS:
-        raise HTTPException(status_code=403, detail="No attempts left")
-    
-    user_info["attempts"] = user_info.get("attempts", 0) + 1
-    
-    prizes_list = [
-        {"name": "Nail Bracelet", "starPrice": 100000, "img": "images/nail_bracelet.png"},
-        {"name": "Bonded Ring", "starPrice": 37500, "img": "images/bonded_ring.png"},
-        {"name": "Neko Helmet", "starPrice": 14000, "img": "images/neko_helmet.png"},
-        {"name": "Diamond Ring", "starPrice": 6700, "img": "images/diamond_ring.png"},
-        {"name": "Love Potion", "starPrice": 4200, "img": "images/love_potion.png"},
-        {"name": "Easter Egg", "starPrice": 1050, "img": "images/easter_egg.png"},
-        {"name": "Light Sword", "starPrice": 1450, "img": "images/light_sword.png"},
-    ]
-    won_prize = random.choice(prizes_list)
-    
-    if won_prize["starPrice"] > 0:
-        gift_data = {**won_prize, "date": datetime.now().strftime('%d.%m.%Y')}
-        user_info.setdefault("gifts", []).append(gift_data)
+@app.post("/api/spin")
+async def spin_roulette(request: Request):
+    try:
+        data = await request.json()
+        user_id = data.get('user_id')
+        
+        if not user_id:
+            raise HTTPException(status_code=400, detail="No user_id provided")
+            
+        user_data = read_user_data()
+        user_info = user_data.get(str(user_id))
+        
+        if not user_info:
+            raise HTTPException(status_code=404, detail="User not found")
+            
+        if user_info['attempts_left'] <= 0:
+            raise HTTPException(status_code=400, detail="No attempts left")
+            
+        # Получаем выигранный приз
+        won_prize = custom_methods.get_random_prize()
+        
+        # Обновляем данные пользователя
+        user_info['attempts_left'] -= 1
+        if won_prize['starPrice'] > 0:  # Если выиграл реальный приз
+            won_prize['date'] = datetime.now().strftime("%d.%m.%Y %H:%M")
+            user_info['gifts'].append(won_prize)
+            
+        save_user_data(user_data)
+        
+        return {
+            "won_prize": won_prize,
+            "attempts_left": user_info['attempts_left']
+        }
+    except Exception as e:
+        logging.error(f"Error in spin_roulette: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-    all_data[user_id] = user_info
-    write_user_data(all_data)
-    
-    return {"won_prize": won_prize, "attempts_left": MAX_ATTEMPTS - user_info["attempts"]}
-
-@app.get('/api/admin/user_data')
+@app.get("/api/admin/user_data")
 async def get_admin_user_data(request: Request):
     """API для получения данных всех пользователей (только для админа)"""
     try:
@@ -199,169 +211,48 @@ async def get_admin_user_data(request: Request):
         return all_data
     except Exception as e:
         logging.error(f"Error in admin data access: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
-@app.post('/api/admin/add_attempt')
-async def admin_add_attempt(request: Request):
-    """API для добавления попытки пользователю (только для админа)"""
-    try:
-        data = await request.json()
-        admin_id = data.get('admin_id')
-        user_id = str(data.get('user_id'))
-
-        if not admin_id or admin_id != config.admin_id:
-            raise HTTPException(status_code=403, detail="Access denied")
-
-        all_data = read_user_data()
-        user_info = all_data.get(user_id, {"attempts": 0, "gifts": []})
-        user_info["attempts"] = max(0, user_info.get("attempts", 0) - 1)  # Уменьшаем количество использованных попыток
-        all_data[user_id] = user_info
-        write_user_data(all_data)
-
-        return {"success": True, "attempts": user_info["attempts"]}
-    except Exception as e:
-        logging.error(f"Error in admin add attempt: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post('/api/admin/reset_attempts')
-async def admin_reset_attempts(request: Request):
-    """API для сброса попыток пользователя (только для админа)"""
-    try:
-        data = await request.json()
-        admin_id = data.get('admin_id')
-        user_id = str(data.get('user_id'))
-
-        if not admin_id or admin_id != config.admin_id:
-            raise HTTPException(status_code=403, detail="Access denied")
-
-        all_data = read_user_data()
-        user_info = all_data.get(user_id, {"attempts": 0, "gifts": []})
-        user_info["attempts"] = 0
-        all_data[user_id] = user_info
-        write_user_data(all_data)
-
-        return {"success": True}
-    except Exception as e:
-        logging.error(f"Error in admin reset attempts: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post('/api/admin/remove_gift')
-async def admin_remove_gift(request: Request):
-    """API для удаления приза у пользователя (только для админа)"""
-    try:
-        data = await request.json()
-        admin_id = data.get('admin_id')
-        user_id = str(data.get('user_id'))
-        gift_index = data.get('gift_index')
-
-        if not admin_id or admin_id != config.admin_id:
-            raise HTTPException(status_code=403, detail="Access denied")
-
-        all_data = read_user_data()
-        user_info = all_data.get(user_id)
-        if not user_info or 'gifts' not in user_info:
-            raise HTTPException(status_code=404, detail="User or gifts not found")
-
-        if 0 <= gift_index < len(user_info['gifts']):
-            user_info['gifts'].pop(gift_index)
-            all_data[user_id] = user_info
-            write_user_data(all_data)
-            return {"success": True}
-        else:
-            raise HTTPException(status_code=400, detail="Invalid gift index")
-    except Exception as e:
-        logging.error(f"Error in admin remove gift: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post('/api/admin/add_prize')
-async def admin_add_prize(request: Request):
-    """API для выдачи приза пользователю (только для админа)"""
-    try:
-        data = await request.json()
-        admin_id = data.get('admin_id')
-        user_id = str(data.get('user_id'))
-        prize = data.get('prize')
-
-        if not admin_id or admin_id != config.admin_id:
-            raise HTTPException(status_code=403, detail="Access denied")
-
-        if not prize or not isinstance(prize, dict):
-            raise HTTPException(status_code=400, detail="Invalid prize data")
-
-        all_data = read_user_data()
-        user_info = all_data.get(user_id, {"attempts": 0, "gifts": []})
-        
-        # Добавляем дату к призу
-        gift_data = {**prize, "date": datetime.now().strftime('%d.%m.%Y')}
-        user_info.setdefault("gifts", []).append(gift_data)
-        
-        all_data[user_id] = user_info
-        write_user_data(all_data)
-
-        return {"success": True}
-    except Exception as e:
-        logging.error(f"Error in admin add prize: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-# --- 5. Обработчики команд Aiogram ---
-
+# --- 6. Telegram Bot Handlers ---
 @dp.message(CommandStart())
 async def command_start_handler(message: Message) -> None:
     """Обработчик команды /start"""
-    keyboard = types.InlineKeyboardMarkup(
+    keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [types.InlineKeyboardButton(text="🎲 Открыть рулетку", web_app=types.WebAppInfo(url=config.webapp_url))]
+            [InlineKeyboardButton(text="🎲 Открыть рулетку", web_app=WebAppInfo(url=config.webapp_url))]
         ]
     )
     await message.answer(f"Привет, {message.from_user.full_name}! Нажми на кнопку ниже, чтобы открыть рулетку.", reply_markup=keyboard)
 
-@dp.message(lambda message: message.text == "/admin")
+@dp.message(Command("admin"))
 async def admin_command_handler(message: Message) -> None:
     """Обработчик команды /admin"""
     if message.from_user.id != config.admin_id:
         await message.answer("У вас нет прав администратора.")
         return
         
-    keyboard = types.InlineKeyboardMarkup(
+    keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [types.InlineKeyboardButton(text="👑 Открыть админ-панель", web_app=types.WebAppInfo(url=f"{config.webapp_url}/admin.html"))]
+            [InlineKeyboardButton(text="👑 Открыть админ-панель", web_app=WebAppInfo(url=f"{config.webapp_url}/admin.html"))]
         ]
     )
     await message.answer("Панель администратора:", reply_markup=keyboard)
 
-# --- 6. Раздача статических файлов ---
+# --- 7. Webhook Setup ---
+@app.post("/webhook")
+async def webhook_handler(request: Request):
+    try:
+        data = await request.json()
+        update = types.Update(**data)
+        await dp.feed_update(bot=bot, update=update)
+        return Response(status_code=200)
+    except Exception as e:
+        logging.error(f"Error in webhook handler: {e}")
+        return Response(status_code=500)
 
-# ВАЖНО: эти маршруты должны быть в конце
-app.mount("/images", StaticFiles(directory="images"), name="images")
-
-@app.get("/{file_path:path}")
-async def serve_static_files(file_path: str):
-    # Отдаем index.html для корневого запроса
-    if file_path in ["", "index.html"]:
-        return FileResponse("index.html")
-        
-    # Белый список разрешенных файлов для безопасности
-    allowed_files = ["admin.html", "style.css", "roulette.js", "prizes.js", "admin.js"]
-    if file_path in allowed_files and os.path.exists(file_path):
-        return FileResponse(file_path)
-    
-    # Если файл не найден в белом списке, возвращаем 404
-    logging.warning(f"Static file not found or not allowed: {file_path}")
-    raise HTTPException(status_code=404, detail="Not Found")
-
-# --- 7. Жизненный цикл приложения ---
-
+# --- 8. Startup Event ---
 @app.on_event("startup")
 async def on_startup():
-    if config.webhook_url:
-        await bot.set_webhook(
-            url=f"{config.webhook_url}/webhook",
-            drop_pending_updates=True,
-            secret_token=config.webhook_secret
-        )
-        logging.info(f"Webhook has been set to {config.webhook_url}/webhook")
-
-@app.on_event("shutdown")
-async def on_shutdown():
-    await bot.delete_webhook()
-    logging.info("Webhook has been deleted.") 
+    webhook_url = f"{config.webapp_url}/webhook"
+    await bot.set_webhook(url=webhook_url)
+    logging.info(f"Webhook has been set to {webhook_url}") 
