@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Рулетка подарков</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="/static/style.css">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 </head>
@@ -28,6 +28,9 @@
 
   <div id="tab-content-roulette" class="tab-content active">
     <h1><span>🎁</span> Рулетка подарков</h1>
+    <div class="attempts-info">
+      <p>Осталось попыток: <span id="attempts-left">0</span></p>
+    </div>
     <div class="roulette-container">
       <div id="roulette" class="roulette"></div>
       <div class="pointer"></div>
@@ -45,9 +48,9 @@
 
   <div id="tab-content-gifts" class="tab-content">
     <h1><span>🎁</span> Мои подарки</h1>
-    <ul id="my-gifts-list">
+    <div id="gifts-list">
       <!-- Список подарков пользователя будет здесь -->
-    </ul>
+    </div>
   </div>
 
   <div id="tab-content-info" class="tab-content">
@@ -91,7 +94,7 @@
     </div>
   </div>
 
-  <script src="prizes.js"></script>
-  <script src="roulette.js"></script>
+  <script src="/static/prizes.js"></script>
+  <script src="/static/roulette.js"></script>
 </body>
 </html>

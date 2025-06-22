@@ -1,13 +1,44 @@
 # Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-*build/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
 dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
 *.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
 venv/
 env/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Project specific
+.env
+user_data.json
+static/uploads/
+assets/uploads/
+*.log
+.coverage
+htmlcov/
 
 # Sensitive files
 config.py
@@ -19,7 +50,6 @@ business_connections.json
 Thumbs.db
 
 # Конфиденциальные данные
-.env
 *.env
 
 # Логи
@@ -28,13 +58,6 @@ logs/
 # Временные файлы
 *.tmp
 *.backup.*
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
 
 # Операционная система
 .DS_Store?

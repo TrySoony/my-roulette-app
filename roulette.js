@@ -2,14 +2,22 @@ const roulette = document.getElementById('roulette');
 const spinBtn = document.getElementById('spin');
 const resultDiv = document.getElementById('result');
 const giftsList = document.getElementById('gifts-list');
+const attemptsLeftSpan = document.getElementById('attempts-left');
+const errorDiv = document.getElementById('error-message');
 
 let currentUser = { id: null }; // Храним ID пользователя
 let attemptsLeft = 0; // Храним оставшиеся попытки
 let userGifts = [];
 let telegramUser = null;
+let spinInProgress = false;
 
-function showError(message) {
-    alert(message);
+function showError(message, duration = 5000) {
+    errorDiv.textContent = message;
+    errorDiv.style.display = 'block';
+    setTimeout(() => {
+        errorDiv.style.display = 'none';
+        errorDiv.textContent = '';
+    }, duration);
 }
 
 function showSuccess(message) {
@@ -17,35 +25,26 @@ function showSuccess(message) {
 }
 
 function updateGiftsList(gifts) {
-  const myGiftsList = document.getElementById('my-gifts-list');
-  if (!myGiftsList) return;
-
-  if (!gifts || gifts.length === 0) {
-    myGiftsList.innerHTML = '<div style="color:#888;margin-top:30px;">Подарков пока нет</div>';
-    return;
-  }
-
-  myGiftsList.innerHTML = gifts.map((gift, index) => `
-    <li>
-      <div class="gift-card">
-        <img src="${gift.img}" alt="${gift.name}">
-        <div class="gift-card-title">${gift.name}</div>
-        <div class="gift-card-price">${gift.starPrice}⭐</div>
-        <div class="gift-card-date">Выигран: ${gift.date}</div>
-        <button class="gift-card-btn" data-gift-index="${index}">Нажмите для вывода</button>
-      </div>
-    </li>
-  `).join('');
-
-  // Добавляем обработчики для кнопок вывода
-  const withdrawButtons = myGiftsList.querySelectorAll('.gift-card-btn');
-  withdrawButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const giftIndex = parseInt(btn.dataset.giftIndex, 10);
-      const gift = gifts[giftIndex];
-      showWithdrawModal(gift);
-    });
-  });
+    if (!giftsList) return;
+    
+    if (!gifts || gifts.length === 0) {
+        giftsList.innerHTML = '<p class="empty-state">У вас пока нет выигранных призов.</p>';
+        return;
+    }
+    
+    giftsList.innerHTML = `
+        <h3>Ваши призы:</h3>
+        <div class="gifts-grid">
+            ${gifts.map(gift => `
+                <div class="gift-item">
+                    <img src="${gift.img}" alt="${gift.name}">
+                    <p>${gift.name}</p>
+                    <p>${gift.starPrice}⭐</p>
+                    <p class="gift-date">${gift.date || 'Дата не указана'}</p>
+                </div>
+            `).join('')}
+        </div>
+    `;
 }
 
 function showWithdrawModal(gift) {
@@ -69,87 +68,12 @@ function showWithdrawModal(gift) {
   };
 }
 
-function initializeApp() {
-    try {
-        const tg = window.Telegram.WebApp;
-        tg.ready();
-        tg.expand();
-
-        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-            telegramUser = tg.initDataUnsafe.user;
-            currentUser.id = telegramUser.id;
-            
-            announceUser(telegramUser.id).then(() => {
-                fetchUserStatus(telegramUser.id);
-            });
-        } else {
-            let errorDetails = [`tg.initData: ${tg.initData}`, `tg.initDataUnsafe: ${JSON.stringify(tg.initDataUnsafe, null, 2)}`];
-            const friendlyMessage = "Это приложение должно запускаться из Telegram.\nПожалуйста, не открывайте ссылку напрямую в браузере. Вернитесь в бот и нажмите кнопку 'Открыть рулетку'.";
-            showError("Ошибка: не удалось получить данные пользователя.\n\n" + friendlyMessage + "\n\n--- Техническая информация ---\n" + errorDetails.join('\n'));
-            spinBtn.disabled = true;
-        }
-    } catch (e) {
-        showError(`Критическая ошибка инициализации: ${e.message}. Приложение должно запускаться из Telegram.`);
-        spinBtn.disabled = true;
-    }
-}
-
-// Новая функция для создания/анонсирования пользователя на сервере
-async function announceUser(userId) {
-  // Валидация userId на клиенте
-  if (!userId || typeof userId !== 'number' || userId <= 0) {
-    console.error('Invalid user ID:', userId);
-    throw new Error('Invalid user ID');
-  }
-
-  try {
-    const response = await fetch('/api/user', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: userId })
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Server error');
-    }
-    
-    const data = await response.json();
-    console.log('User announced successfully:', data.message);
-    currentUser.id = userId; // Устанавливаем ID текущего пользователя
-  } catch (error) {
-    console.error("Error announcing user:", error);
-    throw error;
-  }
-}
-
-// Получаем статус пользователя с сервера
-async function fetchUserStatus(userId) {
-    try {
-        const response = await fetch(`/api/get_user_status?user_id=${userId}`);
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Server error');
-        }
-        const data = await response.json();
-        attemptsLeft = data.attempts_left;
-        updateSpinBtnState();
-        if (data.gifts) {
-            userGifts = data.gifts;
-            updateGiftsList(data.gifts);
-        }
-    } catch (error) {
-        console.error("Failed to fetch user status:", error);
-        throw error;
-    }
-}
-
 function updateSpinBtnState() {
-    spinBtn.disabled = attemptsLeft <= 0;
-    if (attemptsLeft <= 0) {
-        spinBtn.textContent = 'Попытки закончились';
-    } else {
-        spinBtn.textContent = `Крутить! (${attemptsLeft} попыток)`;
+    const canSpin = attemptsLeft > 0 && !spinInProgress;
+    spinBtn.disabled = !canSpin;
+    spinBtn.textContent = canSpin ? 'Крутить!' : 'Нет попыток';
+    if (attemptsLeftSpan) {
+        attemptsLeftSpan.textContent = attemptsLeft;
     }
 }
 
@@ -175,16 +99,8 @@ function renderPrizes(extendedPrizes) {
 }
 
 function getPrizeWidth() {
-  const tempPrize = document.createElement('div');
-  tempPrize.className = 'prize';
-  tempPrize.style.visibility = 'hidden';
-  tempPrize.textContent = 'test';
-  roulette.appendChild(tempPrize);
-  const prizeWidth = tempPrize.offsetWidth +
-    parseInt(getComputedStyle(tempPrize).marginLeft) +
-    parseInt(getComputedStyle(tempPrize).marginRight);
-  roulette.removeChild(tempPrize);
-  return prizeWidth;
+    const prizeElement = document.querySelector('.prize');
+    return prizeElement ? prizeElement.offsetWidth : 100;
 }
 
 // Функция для запуска конфетти-салюта
@@ -241,29 +157,37 @@ winModalBtn.addEventListener('click', () => {
 });
 
 async function spinRoulette() {
-    if (attemptsLeft <= 0) {
-        showError("У вас не осталось попыток.");
+    if (spinInProgress) {
+        showError("Подождите, рулетка еще крутится");
         return;
     }
-    spinBtn.disabled = true;
-
+    
+    if (attemptsLeft <= 0) {
+        showError("У вас не осталось попыток");
+        return;
+    }
+    
     try {
-        // 1. Сначала получаем результат с сервера
-        const response = await fetch('/api/spin', {
+        spinInProgress = true;
+        spinBtn.disabled = true;
+        updateSpinBtnState();
+        
+        // 1. Получаем результат с сервера
+        const data = await fetch('/api/spin', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ user_id: currentUser.id })
         });
 
-        if (!response.ok) {
-            const errorData = await response.json();
+        if (!data.ok) {
+            const errorData = await data.json();
             throw new Error(errorData.error || 'Не удалось выполнить прокрутку');
         }
 
-        const data = await response.json();
-        const wonPrize = data.won_prize;
+        const result = await data.json();
+        const wonPrize = result.won_prize;
         
-        // 2. Теперь запускаем анимацию
+        // 2. Запускаем анимацию
         const prizeCount = prizes.length;
         const prizeWidth = getPrizeWidth();
         const visibleCount = Math.floor(roulette.parentElement.offsetWidth / prizeWidth);
@@ -307,24 +231,30 @@ async function spinRoulette() {
 
         // Обновляем состояние и показываем результат после завершения анимации
         roulette.addEventListener('transitionend', async () => {
-            attemptsLeft = data.attempts_left;
-            updateSpinBtnState();
+            try {
+                attemptsLeft = result.attempts_left;
+                updateSpinBtnState();
 
-            if (wonPrize.starPrice > 0) {
-                showWinModal(wonPrize);
-                // Обновляем список подарков
-                await fetchUserStatus(currentUser.id);
-            } else {
-                resultDiv.textContent = 'Вы ничего не выиграли.';
+                if (wonPrize.starPrice > 0) {
+                    showWinModal(wonPrize);
+                    // Обновляем список подарков
+                    await fetchUserStatus(currentUser.id);
+                } else {
+                    resultDiv.textContent = 'К сожалению, вы ничего не выиграли в этот раз.';
+                }
+            } catch (error) {
+                showError(`Ошибка при обновлении статуса: ${error.message}`);
+            } finally {
+                spinInProgress = false;
+                updateSpinBtnState();
             }
-            
-            spinBtn.disabled = false;
         }, { once: true });
 
     } catch (error) {
         console.error('Error during spin:', error);
         showError(`Ошибка: ${error.message}`);
-        spinBtn.disabled = false;
+        spinInProgress = false;
+        updateSpinBtnState();
     }
 }
 
@@ -344,8 +274,96 @@ async function spinRoulette() {
     renderPrizes(extendedPrizes);
 })();
 
+function initializeApp() {
+    try {
+        const tg = window.Telegram.WebApp;
+        if (!tg) {
+            throw new Error("Telegram Web App не найден");
+        }
+        
+        tg.ready();
+        tg.expand();
+
+        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+            telegramUser = tg.initDataUnsafe.user;
+            currentUser.id = telegramUser.id;
+            
+            announceUser(telegramUser.id)
+                .then(() => fetchUserStatus(telegramUser.id))
+                .catch(error => {
+                    showError(`Ошибка инициализации: ${error.message}`);
+                    spinBtn.disabled = true;
+                });
+        } else {
+            let errorDetails = [
+                `tg.initData: ${tg.initData}`,
+                `tg.initDataUnsafe: ${JSON.stringify(tg.initDataUnsafe, null, 2)}`
+            ];
+            const friendlyMessage = "Это приложение должно запускаться из Telegram.\nПожалуйста, не открывайте ссылку напрямую в браузере. Вернитесь в бот и нажмите кнопку 'Открыть рулетку'.";
+            showError("Ошибка: не удалось получить данные пользователя.\n\n" + friendlyMessage + "\n\n--- Техническая информация ---\n" + errorDetails.join('\n'));
+            spinBtn.disabled = true;
+        }
+    } catch (e) {
+        showError(`Критическая ошибка инициализации: ${e.message}. Приложение должно запускаться из Telegram.`);
+        spinBtn.disabled = true;
+    }
+}
+
+// Новая функция для создания/анонсирования пользователя на сервере
+async function announceUser(userId) {
+    if (!userId || typeof userId !== 'number' || userId <= 0) {
+        throw new Error('Некорректный ID пользователя');
+    }
+    
+    try {
+        const response = await fetch('/api/user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: userId })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Server error');
+        }
+        
+        const data = await response.json();
+        console.log('User announced successfully:', data.message);
+        currentUser.id = userId; // Устанавливаем ID текущего пользователя
+        return data;
+    } catch (error) {
+        console.error("Error announcing user:", error);
+        throw error;
+    }
+}
+
+// Получаем статус пользователя с сервера
+async function fetchUserStatus(userId) {
+    if (!userId || typeof userId !== 'number' || userId <= 0) {
+        throw new Error('Некорректный ID пользователя');
+    }
+    
+    try {
+        const response = await fetch(`/api/get_user_status?user_id=${userId}`);
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Server error');
+        }
+        const data = await response.json();
+        attemptsLeft = data.attempts_left;
+        updateSpinBtnState();
+        if (data.gifts) {
+            userGifts = data.gifts;
+            updateGiftsList(data.gifts);
+        }
+    } catch (error) {
+        console.error("Failed to fetch user status:", error);
+        throw error;
+    }
+}
+
+// Обработчик нажатия на кнопку
+spinBtn.addEventListener('click', spinRoulette);
+
 // Инициализация приложения
 initializeApp();
-
-// Добавляем обработчик события для кнопки спина
-spinBtn.addEventListener('click', spinRoulette);

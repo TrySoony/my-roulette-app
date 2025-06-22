@@ -65,8 +65,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderUsers(users) {
         userList.innerHTML = Object.entries(users).map(([userId, userData]) => {
-            const attempts = userData.attempts || 0;
-            const attemptsLeft = MAX_ATTEMPTS - attempts;
+            const attemptsLeft = userData.attempts_left || 0;
+            const attemptsUsed = MAX_ATTEMPTS - attemptsLeft;
             const gifts = userData.gifts || [];
             
             return `
@@ -80,7 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                     </div>
                     <div class="user-info">
-                        <p>Использовано попыток: <span class="attempts-count">${attempts}</span></p>
+                        <p>Использовано попыток: <span class="attempts-used">${attemptsUsed}</span></p>
                         <p>Осталось попыток: <span class="attempts-left">${attemptsLeft}</span></p>
                     </div>
                     <div class="user-gifts">
@@ -181,10 +181,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const result = await apiCall('/api/admin/add_attempt', { user_id: userId });
         if (result && result.success) {
             // Обновляем UI
-            const attemptsSpan = document.querySelector(`.user-card[data-user-id="${userId}"] .attempts-count`);
+            const attemptsSpan = document.querySelector(`.user-card[data-user-id="${userId}"] .attempts-used`);
             const attemptsLeftSpan = document.querySelector(`.user-card[data-user-id="${userId}"] .attempts-left`);
-            if (attemptsSpan) attemptsSpan.textContent = result.attempts;
-            if (attemptsLeftSpan) attemptsLeftSpan.textContent = 2 - result.attempts;
+            if (attemptsSpan) attemptsSpan.textContent = MAX_ATTEMPTS - result.attempts_left;
+            if (attemptsLeftSpan) attemptsLeftSpan.textContent = result.attempts_left;
             showSuccess("Попытка добавлена!");
         }
     }
@@ -194,10 +194,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const result = await apiCall('/api/admin/reset_attempts', { user_id: userId });
         if (result && result.success) {
             // Обновляем UI
-            const attemptsSpan = document.querySelector(`.user-card[data-user-id="${userId}"] .attempts-count`);
+            const attemptsSpan = document.querySelector(`.user-card[data-user-id="${userId}"] .attempts-used`);
             const attemptsLeftSpan = document.querySelector(`.user-card[data-user-id="${userId}"] .attempts-left`);
             if (attemptsSpan) attemptsSpan.textContent = '0';
-            if (attemptsLeftSpan) attemptsLeftSpan.textContent = '2';
+            if (attemptsLeftSpan) attemptsLeftSpan.textContent = MAX_ATTEMPTS.toString();
             showSuccess("Попытки сброшены!");
         }
     }

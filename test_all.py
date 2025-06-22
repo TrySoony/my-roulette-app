@@ -7,6 +7,11 @@ import sys
 import json
 import asyncio
 from datetime import datetime
+import pytest
+from fastapi.testclient import TestClient
+from main import app
+from config import config
+from utils import DataManager
 
 # Устанавливаем фиктивные переменные окружения для тестирования
 os.environ['BOT_TOKEN'] = '1234567890:ABCdefGHIjklMNOpqrsTUVwxyz'
@@ -15,6 +20,37 @@ os.environ['RENDER_EXTERNAL_URL'] = 'https://test-app.onrender.com'
 os.environ['WEBHOOK_SECRET'] = 'test_secret_token_123'
 os.environ['MAX_ATTEMPTS'] = '2'
 os.environ['DEBUG'] = 'true'
+
+# Инициализация тестового клиента
+client = TestClient(app)
+
+# Тестовые данные
+TEST_USER_ID = "123456789"
+TEST_ADMIN_ID = config.admin_id
+TEST_PRIZE = {
+    "name": "Test Prize",
+    "starPrice": 100,
+    "img": "/assets/test_prize.png"
+}
+
+# Фикстуры
+@pytest.fixture
+def test_data_manager():
+    """Создает тестовый менеджер данных с временным файлом"""
+    test_file = "test_user_data.json"
+    manager = DataManager(test_file)
+    yield manager
+    # Очистка после тестов
+    if os.path.exists(test_file):
+        os.remove(test_file)
+
+@pytest.fixture
+def test_user_data():
+    """Создает тестовые данные пользователя"""
+    return {
+        "attempts_left": config.max_attempts,
+        "gifts": []
+    }
 
 def test_imports():
     """Тестирует все необходимые импорты"""
@@ -261,6 +297,156 @@ def test_api_endpoints():
         print(f"❌ Ошибка тестирования API: {e}")
         return False
 
+# Тесты API эндпоинтов
+def test_health_check():
+    """Тест эндпоинта проверки работоспособности"""
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "healthy"}
+
+def test_root_page():
+    """Тест главной страницы"""
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+
+def test_admin_page():
+    """Тест страницы администратора"""
+    response = client.get("/admin")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+
+# Тесты API пользователя
+def test_announce_user():
+    """Тест регистрации пользователя"""
+    response = client.post(
+        "/api/user",
+        json={"user_id": TEST_USER_ID}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "success"
+    assert "user_data" in data
+
+def test_get_user_status():
+    """Тест получения статуса пользователя"""
+    response = client.get(f"/api/get_user_status?user_id={TEST_USER_ID}")
+    assert response.status_code == 200
+    data = response.json()
+    assert "attempts_left" in data
+    assert "gifts" in data
+
+def test_spin_roulette():
+    """Тест вращения рулетки"""
+    response = client.post(
+        "/api/spin",
+        json={"user_id": TEST_USER_ID}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "won_prize" in data
+    assert "attempts_left" in data
+
+# Тесты админского API
+def test_admin_add_attempt():
+    """Тест добавления попытки администратором"""
+    response = client.post(
+        "/api/admin/add_attempt",
+        json={
+            "user_id": TEST_USER_ID,
+            "admin_id": TEST_ADMIN_ID
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert "attempts" in data
+
+def test_admin_reset_attempts():
+    """Тест сброса попыток администратором"""
+    response = client.post(
+        "/api/admin/reset_attempts",
+        json={
+            "user_id": TEST_USER_ID,
+            "admin_id": TEST_ADMIN_ID
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+
+def test_admin_add_prize():
+    """Тест добавления приза администратором"""
+    response = client.post(
+        "/api/admin/add_prize",
+        json={
+            "user_id": TEST_USER_ID,
+            "admin_id": TEST_ADMIN_ID,
+            "prize": TEST_PRIZE
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+
+# Тесты DataManager
+def test_data_manager_operations(test_data_manager, test_user_data):
+    """Тест операций менеджера данных"""
+    # Тест создания данных
+    test_data_manager._save_data({TEST_USER_ID: test_user_data})
+    
+    # Тест чтения данных
+    data = test_data_manager.read_data()
+    assert TEST_USER_ID in data
+    assert data[TEST_USER_ID]["attempts_left"] == config.max_attempts
+    
+    # Тест обновления данных
+    def update_func(user_info):
+        user_info["attempts_left"] -= 1
+        return user_info
+    
+    updated_data = test_data_manager.update_user_data(TEST_USER_ID, update_func)
+    assert updated_data["attempts_left"] == config.max_attempts - 1
+    
+    # Тест добавления подарка
+    test_data_manager.add_gift(TEST_USER_ID, TEST_PRIZE, config.max_attempts)
+    data = test_data_manager.read_data()
+    assert len(data[TEST_USER_ID]["gifts"]) == 1
+    assert data[TEST_USER_ID]["gifts"][0]["name"] == TEST_PRIZE["name"]
+    
+    # Тест удаления подарка
+    updated_data = test_data_manager.remove_gift(TEST_USER_ID, 0)
+    assert len(updated_data["gifts"]) == 0
+
+def test_invalid_user_operations():
+    """Тест операций с недопустимыми данными пользователя"""
+    # Тест с неверным ID пользователя
+    response = client.post(
+        "/api/user",
+        json={"user_id": "invalid_id"}
+    )
+    assert response.status_code == 400
+    
+    # Тест с отсутствующим ID пользователя
+    response = client.post("/api/user", json={})
+    assert response.status_code == 400
+
+def test_invalid_admin_operations():
+    """Тест админских операций с недопустимыми данными"""
+    # Тест с неверным ID администратора
+    response = client.post(
+        "/api/admin/add_attempt",
+        json={
+            "user_id": TEST_USER_ID,
+            "admin_id": 999999
+        }
+    )
+    assert response.status_code == 403
+    
+    # Тест с отсутствующими данными
+    response = client.post("/api/admin/add_attempt", json={})
+    assert response.status_code == 400
+
 def main():
     """Основная функция тестирования"""
     print("🧪 Начинаем комплексное тестирование проекта...\n")
@@ -317,4 +503,4 @@ def main():
     print("   5. Проверьте админ-панель командой /admin")
 
 if __name__ == "__main__":
-    main() 
+    pytest.main(["-v", "--cov=.", "test_all.py"]) 
