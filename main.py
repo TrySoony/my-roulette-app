@@ -165,17 +165,10 @@ app.mount("/images", StaticFiles(directory="images"), name="images")
 
 @app.get("/{file_path:path}")
 async def serve_static_files(file_path: str):
-    # Отдаем index.html для корневого запроса
-    if file_path == "" or file_path == "index.html":
-        return FileResponse("index.html")
-        
-    # Белый список разрешенных файлов для безопасности
-    allowed_files = ["admin.html", "style.css", "roulette.js", "prizes.js", "admin.js"]
+    if file_path in ["", "index.html"]: return FileResponse("index.html")
+        allowed_files = ["admin.html", "style.css", "roulette.js", "prizes.js", "admin.js"]
     if file_path in allowed_files and os.path.exists(file_path):
         return FileResponse(file_path)
-    
-    # Если файл не найден в белом списке, возвращаем 404
-    logging.warning(f"Static file not found or not allowed: {file_path}")
     raise HTTPException(status_code=404, detail="Not Found")
 
 # --- 7. Жизненный цикл приложения ---
