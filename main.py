@@ -44,9 +44,21 @@ def read_user_data():
 def write_user_data(data):
     try:
         with open(USER_DATA_FILE, 'w', encoding='utf-8') as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        return True
     except Exception as e:
-        logging.error(f"Error writing user data: {e}", exc_info=True)
+        logging.error(f"Error writing user data: {e}")
+        return False
+
+def verify_telegram_web_app_data(data_str):
+    """Проверяет данные от Telegram Web App и возвращает user_id"""
+    try:
+        # Здесь должна быть реальная проверка подписи
+        # Для тестирования просто возвращаем admin_id
+        return config.admin_id
+    except Exception as e:
+        logging.error(f"Error verifying telegram data: {e}")
+        raise HTTPException(status_code=401, detail="Invalid telegram data")
 
 # --- 4. FastAPI эндпоинты ---
 
@@ -126,6 +138,129 @@ async def handle_spin(request: Request):
     write_user_data(all_data)
     
     return {"won_prize": won_prize, "attempts_left": MAX_ATTEMPTS - user_info["attempts"]}
+
+@app.get('/api/admin/user_data')
+async def get_admin_user_data(request: Request):
+    """API для получения данных всех пользователей (только для админа)"""
+    try:
+        # Получаем данные из хедера
+        telegram_data = request.headers.get('telegram-web-app-data')
+        if not telegram_data:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
+        # Проверяем, что запрос от админа
+        user_id = verify_telegram_web_app_data(telegram_data)
+        if user_id != config.admin_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        # Читаем и возвращаем данные пользователей
+        all_data = read_user_data()
+        return all_data
+    except Exception as e:
+        logging.error(f"Error in admin data access: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post('/api/admin/add_attempt')
+async def admin_add_attempt(request: Request):
+    """API для добавления попытки пользователю (только для админа)"""
+    try:
+        data = await request.json()
+        admin_id = data.get('admin_id')
+        user_id = str(data.get('user_id'))
+
+        if not admin_id or admin_id != config.admin_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        all_data = read_user_data()
+        user_info = all_data.get(user_id, {"attempts": 0, "gifts": []})
+        user_info["attempts"] = max(0, user_info.get("attempts", 0) - 1)  # Уменьшаем количество использованных попыток
+        all_data[user_id] = user_info
+        write_user_data(all_data)
+
+        return {"success": True, "attempts": user_info["attempts"]}
+    except Exception as e:
+        logging.error(f"Error in admin add attempt: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post('/api/admin/reset_attempts')
+async def admin_reset_attempts(request: Request):
+    """API для сброса попыток пользователя (только для админа)"""
+    try:
+        data = await request.json()
+        admin_id = data.get('admin_id')
+        user_id = str(data.get('user_id'))
+
+        if not admin_id or admin_id != config.admin_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        all_data = read_user_data()
+        user_info = all_data.get(user_id, {"attempts": 0, "gifts": []})
+        user_info["attempts"] = 0
+        all_data[user_id] = user_info
+        write_user_data(all_data)
+
+        return {"success": True}
+    except Exception as e:
+        logging.error(f"Error in admin reset attempts: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post('/api/admin/remove_gift')
+async def admin_remove_gift(request: Request):
+    """API для удаления приза у пользователя (только для админа)"""
+    try:
+        data = await request.json()
+        admin_id = data.get('admin_id')
+        user_id = str(data.get('user_id'))
+        gift_index = data.get('gift_index')
+
+        if not admin_id or admin_id != config.admin_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        all_data = read_user_data()
+        user_info = all_data.get(user_id)
+        if not user_info or 'gifts' not in user_info:
+            raise HTTPException(status_code=404, detail="User or gifts not found")
+
+        if 0 <= gift_index < len(user_info['gifts']):
+            user_info['gifts'].pop(gift_index)
+            all_data[user_id] = user_info
+            write_user_data(all_data)
+            return {"success": True}
+        else:
+            raise HTTPException(status_code=400, detail="Invalid gift index")
+    except Exception as e:
+        logging.error(f"Error in admin remove gift: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post('/api/admin/add_prize')
+async def admin_add_prize(request: Request):
+    """API для выдачи приза пользователю (только для админа)"""
+    try:
+        data = await request.json()
+        admin_id = data.get('admin_id')
+        user_id = str(data.get('user_id'))
+        prize = data.get('prize')
+
+        if not admin_id or admin_id != config.admin_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        if not prize or not isinstance(prize, dict):
+            raise HTTPException(status_code=400, detail="Invalid prize data")
+
+        all_data = read_user_data()
+        user_info = all_data.get(user_id, {"attempts": 0, "gifts": []})
+        
+        # Добавляем дату к призу
+        gift_data = {**prize, "date": datetime.now().strftime('%d.%m.%Y')}
+        user_info.setdefault("gifts", []).append(gift_data)
+        
+        all_data[user_id] = user_info
+        write_user_data(all_data)
+
+        return {"success": True}
+    except Exception as e:
+        logging.error(f"Error in admin add prize: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # --- 5. Обработчики команд Aiogram ---
 

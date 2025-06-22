@@ -17,12 +17,56 @@ function showSuccess(message) {
 }
 
 function updateGiftsList(gifts) {
-    // Эта функция обновляет список подарков в интерфейсе
-    userGifts = gifts || [];
-    // Если есть функция для обновления UI, вызываем её
-    if (typeof window.updateGiftsList === 'function') {
-        window.updateGiftsList(gifts);
+  const giftsList = document.getElementById('my-gifts-list');
+  if (!giftsList) return;
+
+  if (!gifts || gifts.length === 0) {
+    giftsList.innerHTML = '<div style="color:#888;margin-top:30px;">Подарков пока нет</div>';
+    return;
+  }
+
+  giftsList.innerHTML = gifts.map((gift, index) => `
+    <li>
+      <div class="gift-card">
+        <img src="${gift.img}" alt="${gift.name}">
+        <div class="gift-card-title">${gift.name}</div>
+        <div class="gift-card-date">Выигран: ${gift.date}</div>
+        <div class="gift-card-price">${gift.starPrice}⭐</div>
+        <button class="gift-card-btn" data-gift-index="${index}">Нажмите для вывода</button>
+      </div>
+    </li>
+  `).join('');
+
+  // Добавляем обработчики для кнопок вывода
+  const withdrawButtons = giftsList.querySelectorAll('.gift-card-btn');
+  withdrawButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const giftIndex = parseInt(btn.dataset.giftIndex, 10);
+      const gift = gifts[giftIndex];
+      showWithdrawModal(gift);
+    });
+  });
+}
+
+function showWithdrawModal(gift) {
+  const modal = document.getElementById('withdraw-info-modal-overlay');
+  const img = document.getElementById('withdraw-info-img');
+  const title = document.getElementById('withdraw-info-title');
+  
+  img.src = gift.img;
+  title.textContent = gift.name;
+  modal.classList.add('visible');
+  
+  // Обработчик для кнопки "Понятно"
+  const closeBtn = document.getElementById('withdraw-info-btn');
+  closeBtn.onclick = () => modal.classList.remove('visible');
+  
+  // Закрытие по клику на оверлей
+  modal.onclick = (e) => {
+    if (e.target === modal) {
+      modal.classList.remove('visible');
     }
+  };
 }
 
 function initializeApp() {
@@ -222,10 +266,14 @@ async function spinRoulette() {
     }
 
     const wonPrize = data.won_prize;
-    const prizeIndex = prizes.findIndex(p => p.name === wonPrize.name);
+    // Находим приз в локальном списке призов для анимации
+    const prizeIndex = prizes.findIndex(p => 
+      p.name === wonPrize.name && 
+      p.starPrice === wonPrize.starPrice
+    );
     
     if (prizeIndex === -1) {
-        throw new Error("Сервер вернул неизвестный приз.");
+      throw new Error("Сервер вернул неизвестный приз.");
     }
 
     // 2. Теперь запускаем анимацию, зная точный результат
@@ -265,19 +313,20 @@ async function spinRoulette() {
         updateSpinBtnState();
 
         if (wonPrize.starPrice > 0) {
+            // Используем приз, полученный с сервера
             showWinModal(wonPrize);
-            fetchUserStatus(currentUser.id); // Обновляем список подарков
+            // Обновляем список подарков сразу после выигрыша
+            fetchUserStatus(currentUser.id);
         } else {
             resultDiv.textContent = `Вы ничего не выиграли.`;
         }
-        spinBtn.disabled = false; // Разблокируем кнопку после завершения
+        spinBtn.disabled = false;
     }, { once: true });
-
 
   } catch (error) {
     console.error('Error during spin:', error);
     showError(`Ошибка: ${error.message}`);
-    spinBtn.disabled = false; // Разблокируем кнопку в случае ошибки
+    spinBtn.disabled = false;
   }
 }
 

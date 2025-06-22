@@ -501,15 +501,16 @@ ul#my-gifts-list {
     background-color: #f0f2f5;
     font-family: 'Inter', sans-serif;
     color: #333;
+    padding: 20px;
 }
 
 .admin-container {
-    max-width: 900px;
-    margin: 20px auto;
-    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
     background: #fff;
     border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    padding: 20px;
 }
 
 .admin-header {
@@ -568,157 +569,208 @@ ul#my-gifts-list {
 }
 
 .user-card {
-    background: #f9fafb;
-    border: 1px solid #e5e7eb;
+    background: #fff;
+    border: 1px solid #e1e4e8;
     border-radius: 10px;
-    padding: 16px;
+    margin-bottom: 20px;
+    padding: 20px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
 }
 
 .user-card-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 12px;
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #e1e4e8;
 }
 
 .user-card-header h3 {
     margin: 0;
-    font-size: 16px;
-    font-weight: 600;
+    font-size: 1.1rem;
+    color: #24292e;
 }
 
 .user-actions {
     display: flex;
-    gap: 8px;
+    gap: 10px;
 }
 
-.button {
-    padding: 6px 12px;
+.user-actions button {
+    padding: 8px 12px;
+    border: none;
     border-radius: 6px;
-    font-size: 13px;
-    font-weight: 500;
+    font-size: 0.9rem;
     cursor: pointer;
-    border: 1px solid transparent;
-    transition: all 0.2s ease;
+    transition: all 0.2s;
 }
 
-.button.primary { background-color: #4f46e5; color: #fff; }
-.button.primary:hover { background-color: #4338ca; }
-.button.secondary { background-color: #e5e7eb; color: #374151; }
-.button.secondary:hover { background-color: #d1d5db; }
-.button.danger { background-color: #fee2e2; color: #b91c1c; }
-.button.danger:hover { background-color: #fecaca; }
-
-.button.small {
-    padding: 4px 8px;
-    font-size: 12px;
+.add-attempt-btn {
+    background: #2ea44f;
+    color: white;
 }
 
-.gift-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
+.reset-attempts-btn {
+    background: #d73a49;
+    color: white;
+}
+
+.add-prize-btn {
+    background: #0366d6;
+    color: white;
+}
+
+.user-info {
+    margin-bottom: 15px;
+}
+
+.user-info p {
+    margin: 5px 0;
+    color: #586069;
+}
+
+.user-gifts {
+    background: #f6f8fa;
+    border-radius: 6px;
+    padding: 15px;
+}
+
+.user-gifts h4 {
+    margin: 0 0 10px 0;
+    color: #24292e;
 }
 
 .gift-item {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 8px;
+    padding: 10px;
+    background: white;
+    border: 1px solid #e1e4e8;
     border-radius: 6px;
+    margin-bottom: 8px;
 }
 
-.gift-item:nth-child(odd) {
-    background-color: #fff;
-}
-
-.gift-image {
-    width: 32px;
-    height: 32px;
+.gift-thumbnail {
+    width: 40px;
+    height: 40px;
     object-fit: contain;
-    border-radius: 4px;
+    margin-right: 10px;
 }
 
-.empty-state {
+.gift-name {
+    flex: 1;
+    font-weight: 500;
+}
+
+.gift-price {
+    color: #e91e63;
+    font-weight: 600;
+    margin: 0 10px;
+}
+
+.gift-date {
+    color: #586069;
+    margin-right: 10px;
+}
+
+.remove-gift-btn {
+    background: #d73a49;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.no-gifts {
+    color: #586069;
     text-align: center;
-    padding: 40px;
-    color: #6b7280;
+    padding: 20px;
 }
 
 /* Модальное окно */
 .modal {
-    display: none; 
-    position: fixed; 
-    z-index: 1000; 
-    left: 0;
+    display: none;
+    position: fixed;
     top: 0;
+    left: 0;
     width: 100%;
     height: 100%;
-    overflow: auto;
-    background-color: rgba(0,0,0,0.5);
-    align-items: center;
-    justify-content: center;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
 }
 
 .modal-content {
-    background-color: #fff;
-    padding: 24px;
-    border-radius: 12px;
-    width: 90%;
-    max-width: 400px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
     position: relative;
-    animation: fadeIn 0.3s;
+    background: white;
+    margin: 10% auto;
+    padding: 20px;
+    width: 90%;
+    max-width: 500px;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .close-button {
-    color: #aaa;
     position: absolute;
+    right: 10px;
     top: 10px;
-    right: 15px;
     font-size: 24px;
-    font-weight: bold;
     cursor: pointer;
-}
-
-.close-button:hover,
-.close-button:focus {
-    color: #000;
+    color: #586069;
 }
 
 .form-group {
-    margin-bottom: 16px;
+    margin-bottom: 15px;
 }
 
 .form-group label {
     display: block;
-    margin-bottom: 6px;
-    font-size: 14px;
-    font-weight: 500;
+    margin-bottom: 5px;
+    color: #24292e;
 }
 
 .form-group input {
     width: 100%;
-    padding: 8px 12px;
-    border: 1px solid #d1d5db;
+    padding: 8px;
+    border: 1px solid #e1e4e8;
     border-radius: 6px;
     font-size: 14px;
 }
 
-/* Spinner */
+.button.primary {
+    background: #2ea44f;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 20px;
+    font-size: 14px;
+    cursor: pointer;
+    width: 100%;
+}
+
+/* Спиннер загрузки */
 .spinner-container {
-    display: flex;
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.8);
+    z-index: 1000;
     justify-content: center;
     align-items: center;
-    padding: 40px;
 }
 
 .spinner {
-    border: 4px solid #f3f3f3;
-    border-top: 4px solid #4f46e5;
-    border-radius: 50%;
     width: 40px;
     height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #3498db;
+    border-radius: 50%;
     animation: spin 1s linear infinite;
 }
 
@@ -727,7 +779,26 @@ ul#my-gifts-list {
     100% { transform: rotate(360deg); }
 }
 
-@keyframes fadeIn {
-  from {opacity: 0; transform: scale(0.95);}
-  to {opacity: 1; transform: scale(1);}
+/* Адаптивность */
+@media (max-width: 768px) {
+    .user-card-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .user-actions {
+        margin-top: 10px;
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .gift-item {
+        flex-wrap: wrap;
+    }
+
+    .gift-date {
+        width: 100%;
+        margin-top: 5px;
+        text-align: right;
+    }
 }

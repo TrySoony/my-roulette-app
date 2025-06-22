@@ -1,3 +1,5 @@
+const MAX_ATTEMPTS = 2; // Максимальное количество попыток
+
 document.addEventListener('DOMContentLoaded', () => {
     const userList = document.getElementById('user-list');
     const spinner = document.querySelector('.spinner-container');
@@ -36,9 +38,13 @@ document.addEventListener('DOMContentLoaded', () => {
         userList.innerHTML = '';
         try {
             const response = await fetch('/api/admin/user_data');
+            if (!response.ok) {
+                throw new Error('Failed to fetch user data');
+            }
             const users = await response.json();
+            
             if (Object.keys(users).length === 0) {
-                 userList.innerHTML = '<p class="empty-state">Пока что нет данных об игроках.</p>';
+                userList.innerHTML = '<p class="empty-state">Пока что нет данных об игроках.</p>';
             } else {
                 renderUsers(users);
             }
@@ -51,39 +57,40 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderUsers(users) {
-        userList.innerHTML = '';
-        for (const userId in users) {
-            const userData = users[userId];
-            const userCard = document.createElement('div');
-            userCard.className = 'user-card';
-            userCard.dataset.userId = userId;
-
-            const giftsHTML = userData.gifts.map((gift, index) => `
-                <li class="gift-item">
-                    <img src="${gift.img || 'images/default_gift.png'}" class="gift-image" alt="prize">
-                    <span>${gift.name} (${gift.starPrice}★) - ${gift.date}</span>
-                    <button class="button danger small remove-gift-btn" data-index="${index}">Удалить</button>
-                </li>
-            `).join('');
-
-            userCard.innerHTML = `
-                <div class="user-card-header">
-                    <h3>ID: ${userId}</h3>
-                    <div class="user-actions">
-                         <button class="button primary small add-prize-btn">Выдать приз</button>
-                         <button class="button secondary small add-attempt-btn">+1 Попытка</button>
-                         <button class="button danger small reset-attempts-btn">Сбросить попытки</button>
+        userList.innerHTML = Object.entries(users).map(([userId, userData]) => {
+            const attempts = userData.attempts || 0;
+            const attemptsLeft = MAX_ATTEMPTS - attempts;
+            const gifts = userData.gifts || [];
+            
+            return `
+                <div class="user-card" data-user-id="${userId}">
+                    <div class="user-card-header">
+                        <h3>Пользователь ID: ${userId}</h3>
+                        <div class="user-actions">
+                            <button class="add-attempt-btn">Добавить попытку</button>
+                            <button class="reset-attempts-btn">Сбросить попытки</button>
+                            <button class="add-prize-btn">Выдать приз</button>
+                        </div>
+                    </div>
+                    <div class="user-info">
+                        <p>Использовано попыток: <span class="attempts-count">${attempts}</span></p>
+                        <p>Осталось попыток: <span class="attempts-left">${attemptsLeft}</span></p>
+                    </div>
+                    <div class="user-gifts">
+                        <h4>Призы пользователя:</h4>
+                        ${gifts.length ? gifts.map((gift, index) => `
+                            <div class="gift-item">
+                                <img src="${gift.img}" alt="${gift.name}" class="gift-thumbnail">
+                                <span class="gift-name">${gift.name}</span>
+                                <span class="gift-price">${gift.starPrice}⭐</span>
+                                <span class="gift-date">${gift.date}</span>
+                                <button class="remove-gift-btn" data-index="${index}">Удалить</button>
+                            </div>
+                        `).join('') : '<p class="no-gifts">Нет призов</p>'}
                     </div>
                 </div>
-                <div class="user-card-body">
-                    <p>Попыток использовано: <span class="attempts-count">${userData.attempts}</span></p>
-                    <p>Доступно попыток: <span class="attempts-left">${2 - userData.attempts}</span></p>
-                    <h4>Призы:</h4>
-                    <ul class="gift-list">${giftsHTML || '<p>Нет призов</p>'}</ul>
-                </div>
             `;
-            userList.appendChild(userCard);
-        }
+        }).join('');
     }
 
     // Обработчики событий
