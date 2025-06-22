@@ -36,7 +36,6 @@ def read_user_data():
     try:
         with open(USER_DATA_FILE, 'r', encoding='utf-8') as f:
             content = f.read()
-            # Handle empty file case
             return json.loads(content) if content else {}
     except (json.JSONDecodeError, FileNotFoundError):
         logging.error("Could not read or parse user_data.json, returning empty dict.")
@@ -54,13 +53,11 @@ def write_user_data(data):
 @app.post("/webhook")
 async def bot_webhook(request: Request):
     """ Эндпоинт для приема обновлений от Telegram """
-    logging.info("Webhook endpoint called.")
     if config.webhook_secret and request.headers.get('x-telegram-bot-api-secret-token') != config.webhook_secret:
         logging.warning("Invalid secret token received")
         raise HTTPException(status_code=401, detail="Invalid secret token")
     try:
         update_data = await request.json()
-        logging.debug(f"Received update: {update_data}")
         update = types.Update.model_validate(update_data, context={"bot": bot})
         await dp.feed_update(bot, update)
         return {"ok": True}
@@ -93,6 +90,7 @@ async def handle_user_data(request: Request):
         return {"status": "ok"}
     except json.JSONDecodeError:
         raise HTTPException(400, "Invalid JSON")
+
 
 @app.post('/api/spin')
 async def handle_spin(request: Request):
@@ -163,20 +161,20 @@ async def command_admin_handler(message: Message):
 # ВАЖНО: эти маршруты должны быть в конце
 app.mount("/images", StaticFiles(directory="images"), name="images")
 
-    @app.get("/{file_path:path}")
-    async def serve_static_files(file_path: str):
-        # Отдаем index.html для корневого запроса
-        if file_path in ["", "index.html"]:
-            return FileResponse("index.html")
-            
-        # Белый список разрешенных файлов для безопасности
-        allowed_files = ["admin.html", "style.css", "roulette.js", "prizes.js", "admin.js"]
-        if file_path in allowed_files and os.path.exists(file_path):
-            return FileResponse(file_path)
+@app.get("/{file_path:path}")
+async def serve_static_files(file_path: str):
+    # Отдаем index.html для корневого запроса
+    if file_path in ["", "index.html"]:
+        return FileResponse("index.html")
         
-        # Если файл не найден в белом списке, возвращаем 404
-        logging.warning(f"Static file not found or not allowed: {file_path}")
-        raise HTTPException(status_code=404, detail="Not Found")
+    # Белый список разрешенных файлов для безопасности
+    allowed_files = ["admin.html", "style.css", "roulette.js", "prizes.js", "admin.js"]
+    if file_path in allowed_files and os.path.exists(file_path):
+        return FileResponse(file_path)
+    
+    # Если файл не найден в белом списке, возвращаем 404
+    logging.warning(f"Static file not found or not allowed: {file_path}")
+    raise HTTPException(status_code=404, detail="Not Found")
 
 # --- 7. Жизненный цикл приложения ---
 
