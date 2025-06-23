@@ -1,98 +1,39 @@
 // prizes.js
 const prizes = [
-  {
-    name: "Кольцо с бриллиантом",
-    img: "/images/diamond_ring.png",
-    starPrice: 5
+  { 
+    name: "Nail Bracelet", 
+    starPrice: 100000, 
+    img: "images/nail_bracelet.png" // Локальный путь
   },
-  {
-    name: "Световой меч",
-    img: "/images/light_sword.png",
-    starPrice: 4
+  { 
+    name: "Bonded Ring", 
+    starPrice: 37500, 
+    img: "images/bonded_ring.png" // Локальный путь
   },
-  {
-    name: "Браслет с гвоздями",
-    img: "/images/nail_bracelet.png",
-    starPrice: 3
+  { 
+    name: "Neko Helmet", 
+    starPrice: 14000, 
+    img: "images/neko_helmet.png" // Локальный путь
   },
-  {
-    name: "Пасхальное яйцо",
-    img: "/images/easter_egg.png",
-    starPrice: 2
+  { 
+    name: "Diamond Ring", 
+    starPrice: 6700, 
+    img: "images/diamond_ring.png" // Для пустого приза картинка не нужна
   },
-  {
-    name: "Шлем Неко",
-    img: "/images/neko_helmet.png",
-    starPrice: 2
+  { 
+    name: "Love Potion", 
+    starPrice: 4200, 
+    img: "images/love_potion.png" // Локальный путь
   },
-  {
-    name: "Кольцо верности",
-    img: "/images/bonded_ring.png",
-    starPrice: 1
+  { 
+    name: "Easter Egg", 
+    starPrice: 1050, 
+    img: "images/easter_egg.png" // Локальный путь
   },
-  {
-    name: "Любовное зелье",
-    img: "/images/love_potion.png",
-    starPrice: 1
-  }
+  { 
+    name: "Light Sword", 
+    starPrice: 1450, 
+    img: "images/light_sword.png" // Локальный путь
+  },
+
 ];
-
-function showWinModal(prize) {
-  const modalContent = document.createElement('div');
-  modalContent.className = 'modal-content';
-  modalContent.innerHTML = `
-    <div class="win-modal">
-      <h2>Поздравляем!</h2>
-      <div class="prize-display">
-        <img src="${prize.img}" alt="${prize.name}" class="prize-img">
-        <div class="prize-info">
-          <h3>${prize.name}</h3>
-          <p class="prize-value">${prize.starPrice}⭐</p>
-        </div>
-      </div>
-      <p>Вы выиграли ${prize.name}!</p>
-      <button class="modal-close-btn">Закрыть</button>
-    </div>
-  `;
-
-  document.body.appendChild(modalContent);
-
-  const closeBtn = modalContent.querySelector('.modal-close-btn');
-  closeBtn.onclick = () => {
-    modalContent.remove();
-  };
-}
-
-function showWithdrawModal(gift) {
-  const modalContent = document.createElement('div');
-  modalContent.className = 'modal-content';
-  modalContent.innerHTML = `
-    <div class="withdraw-modal">
-      <h2>Вывод подарка</h2>
-      <div class="prize-display">
-        <img src="${gift.img}" alt="${gift.name}" class="prize-img">
-        <div class="prize-info">
-          <h3>${gift.name}</h3>
-          <p class="prize-value">${gift.starPrice}⭐</p>
-        </div>
-      </div>
-      <p>Для вывода подарка, пожалуйста, напишите в чат боту команду:</p>
-      <div class="command-box">
-        <code>/withdraw ${gift.name}</code>
-      </div>
-      <button class="modal-close-btn">Закрыть</button>
-    </div>
-  `;
-
-  document.body.appendChild(modalContent);
-
-  const closeBtn = modalContent.querySelector('.modal-close-btn');
-  closeBtn.onclick = () => {
-    modalContent.remove();
-  };
-}
-
-function getPrizeWidth() {
-  const prize = document.querySelector('.prize');
-  return prize ? prize.offsetWidth : 150;
-}

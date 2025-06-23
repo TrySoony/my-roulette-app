@@ -4,33 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Рулетка подарков</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="style.css">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 </head>
 <body>
-  <div class="tabs-container">
-    <div class="bottom-tabs">
-      <button class="tab-btn active" data-tab="roulette">
-        <span class="tab-icon">🎰</span>
-        Рулетка
-      </button>
-      <button class="tab-btn" data-tab="gifts">
-        <span class="tab-icon">🎁</span>
-        Мои подарки
-      </button>
-      <button class="tab-btn" data-tab="info">
-        <span class="tab-icon">ℹ️</span>
-        Информация
-      </button>
-    </div>
-  </div>
-
   <div id="tab-content-roulette" class="tab-content active">
     <h1><span>🎁</span> Рулетка подарков</h1>
-    <div class="attempts-info">
-      <p>Осталось попыток: <span id="attempts-left">0</span></p>
-    </div>
     <div class="roulette-container">
       <div id="roulette" class="roulette"></div>
       <div class="pointer"></div>
@@ -45,38 +25,37 @@
       </ul>
     </div>
   </div>
-
-  <div id="tab-content-gifts" class="tab-content">
-    <h1><span>🎁</span> Мои подарки</h1>
-    <div id="gifts-list">
-      <!-- Список подарков пользователя будет здесь -->
-    </div>
+  <div id="tab-content-gifts" class="tab-content" style="display:none">
+    <h1 style="color:#e91e63;"><span>🎁</span> Мои подарки</h1>
+    <ul id="my-gifts-list">
+      <!-- Карточки подарков будут добавляться через JS -->
+    </ul>
   </div>
-
-  <div id="tab-content-info" class="tab-content">
-    <h1><span>ℹ️</span> Информация</h1>
-    <div class="info-content">
-      <p>Добро пожаловать в рулетку подарков!</p>
-      <p>У вас есть 2 попытки, чтобы испытать удачу.</p>
-      <p>Выигранные подарки появятся во вкладке "Мои подарки".</p>
+  <div id="tab-content-info" class="tab-content" style="display:none">
+    <h1 style="color:#1976d2;"><span>ℹ️</span> Информация</h1>
+    <p>Это приложение для розыгрыша подарков через Telegram-бота.</p>
+    <p>Здесь вы можете крутить рулетку, выигрывать призы и выводить их обратно в бота.</p>
+  </div>
+  
+  <div class="tabs-container">
+    <div class="bottom-tabs">
+      <button class="tab-btn active" data-tab="roulette"><span class="tab-icon">🎰</span>Рулетка</button>
+      <button class="tab-btn" data-tab="gifts"><span class="tab-icon">🎁</span>Мои подарки</button>
+      <button class="tab-btn" data-tab="info"><span class="tab-icon">ℹ️</span>Информация</button>
     </div>
   </div>
 
   <!-- Модальное окно выигрыша -->
   <div id="win-modal-overlay" class="modal-overlay">
-    <div class="modal-content">
-      <div class="modal-header">
-        <span class="modal-icon">🎉</span>
-        <h1>Поздравляем!</h1>
-      </div>
+    <div id="win-modal-content" class="modal-content">
       <img id="win-modal-img" src="" alt="Выигранный приз">
       <h2 id="win-modal-title"></h2>
-      <div id="win-modal-price" class="prize-price"></div>
-      <button id="win-modal-btn">Забрать</button>
+      <p id="win-modal-price"></p>
+      <button id="win-modal-btn">Перейти к моим подаркам</button>
     </div>
   </div>
 
-  <!-- Модальное окно для вывода подарка -->
+  <!-- Новое модальное окно для вывода подарка -->
   <div id="withdraw-info-modal-overlay" class="modal-overlay">
     <div class="modal-content">
       <div class="modal-header">
@@ -94,7 +73,94 @@
     </div>
   </div>
 
-  <script src="/static/prizes.js"></script>
-  <script src="/static/roulette.js"></script>
+  <script src="prizes.js"></script>
+  <script src="roulette.js"></script>
+  <script>
+    // Переключение вкладок
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabContents = {
+      roulette: document.getElementById('tab-content-roulette'),
+      gifts: document.getElementById('tab-content-gifts'),
+      info: document.getElementById('tab-content-info')
+    };
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        tabBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        Object.values(tabContents).forEach(tc => tc.style.display = 'none');
+        tabContents[btn.dataset.tab].style.display = '';
+      });
+    });
+
+    // Генерация списка призов под рулеткой
+    function generatePrizeList() {
+      const prizeList = document.getElementById('prize-list');
+      // Фильтруем "Пусто"
+      const displayPrizes = prizes.filter(p => p.starPrice > 0);
+      
+      prizeList.innerHTML = displayPrizes.map(prize => `
+        <li>
+          <img src="${prize.img}" alt="${prize.name}">
+          <span class="prize-list-name">${prize.name}</span>
+          <span class="prize-list-price">${prize.starPrice}⭐</span>
+        </li>
+      `).join('');
+    }
+
+    // Вызываем генерацию списка при загрузке
+    document.addEventListener('DOMContentLoaded', generatePrizeList);
+
+    // Пример подарка для отображения (замени на динамические данные при необходимости)
+    function renderGiftCard(gift, index) {
+      return `<li><div class="gift-card">
+        <img src="${gift.img}" alt="${gift.name}">
+        <div class="gift-card-title">${gift.name}</div>
+        <div class="gift-card-date">Выигран: ${gift.date}</div>
+        <button class="gift-card-btn" data-gift-index="${index}">Нажмите для вывода</button>
+      </div></li>`;
+    }
+    function getGiftsFromStorage() {
+      // Эта функция больше не нужна в таком виде, данные приходят с сервера
+      return []; 
+    }
+    function updateGiftsList(gifts) { // Теперь функция принимает подарки как аргумент
+      document.getElementById('my-gifts-list').innerHTML = gifts.length
+        ? gifts.map((gift, index) => renderGiftCard(gift, index)).join('')
+        : '<div style="color:#888;margin-top:30px;">Подарков пока нет</div>';
+    }
+
+    // Логика для модального окна вывода
+    const withdrawModalOverlay = document.getElementById('withdraw-info-modal-overlay');
+    const withdrawModalImg = document.getElementById('withdraw-info-img');
+    const withdrawModalTitle = document.getElementById('withdraw-info-title');
+    const withdrawModalBtn = document.getElementById('withdraw-info-btn');
+
+    function showWithdrawModal(gift) {
+      withdrawModalImg.src = gift.img;
+      withdrawModalTitle.textContent = gift.name;
+      withdrawModalOverlay.classList.add('visible');
+    }
+    
+    document.getElementById('my-gifts-list').addEventListener('click', async (e) => {
+      if (e.target && e.target.classList.contains('gift-card-btn')) {
+        const giftIndex = e.target.dataset.giftIndex;
+        // Получаем свежие данные с сервера, чтобы убедиться, что подарок еще там
+        const response = await fetch(`/api/get_user_status?user_id=${currentUser.id}`);
+        const data = await response.json();
+        if (data.gifts && data.gifts[giftIndex]) {
+          const gift = data.gifts[giftIndex];
+          showWithdrawModal(gift);
+        }
+      }
+    });
+
+    withdrawModalBtn.addEventListener('click', () => {
+      withdrawModalOverlay.classList.remove('visible');
+      if (window.Telegram && Telegram.WebApp) {
+        Telegram.WebApp.sendData(JSON.stringify({action: "show_connection_instructions"}));
+        Telegram.WebApp.close();
+      }
+    });
+  </script>
 </body>
 </html>
